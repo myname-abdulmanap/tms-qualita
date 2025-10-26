@@ -1,9 +1,9 @@
 // components/Sidebar.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useUi } from "@/lib/ui-store";
 import { Icon } from "@iconify/react";
 
@@ -35,9 +35,36 @@ export function Sidebar() {
   const { darkMode, sidebarOpen, setSidebarOpen, isMobile } = useUi();
   const pathname = usePathname();
   const router = useRouter();
+  const search = useSearchParams();
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // ====== MODE SCREENSHOT ======
+  // Aktifkan dengan menambahkan ?capture=1 pada URL
+  const captureMode = useMemo(() => search?.get("capture") === "1", [search]);
+  const [docHeight, setDocHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!captureMode || isMobile) return;
+    // ukur tinggi dokumen supaya sidebar bisa "ikut panjang" saat full-page screenshot
+    const measure = () =>
+      setDocHeight(
+        Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight
+        )
+      );
+    measure();
+    window.addEventListener("resize", measure);
+    // kalau konten dinamis, observer bantu update tinggi
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.documentElement);
+    return () => {
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+    };
+  }, [captureMode, isMobile]);
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
@@ -53,40 +80,58 @@ export function Sidebar() {
     }
   }
 
+  // Z-index rules (pastikan sidebar > header saat mobile)
+  const overlayZ = isMobile && sidebarOpen ? "z-[80]" : "z-40";
+  const sidebarZ =
+    isMobile && sidebarOpen ? (logoutOpen ? "z-[100]" : "z-[90]") : logoutOpen ? "z-[60]" : "z-50";
+  const dialogZ = "z-[110]";
+
   return (
     <>
-      {/* Overlay mobile */}
-      {isMobile && sidebarOpen && (
+      {/* Overlay mobile: matikan saat capture mode (biar bersih) */}
+      {isMobile && sidebarOpen && !captureMode && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className={`fixed inset-0 bg-black/50 lg:hidden ${overlayZ}`}
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside
-        className={`${
+        className={[
+          // Width & slide behavior
           isMobile
             ? sidebarOpen
-              ? "translate-x-0"
-              : "-translate-x-full"
+              ? "translate-x-0 w-64"
+              : "-translate-x-full w-64"
             : sidebarOpen
             ? "w-56"
-            : "w-16"
-        }
-          ${sidebarOpen ? "w-56" : "lg:w-16"} min-h-screen
-          ${
-            darkMode
-              ? "bg-slate-900"
-              : "bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800"
-          }
-          text-white ${sidebarOpen ? "p-3" : "lg:p-3 p-0"} flex flex-col
-          transition-all duration-300 ease-in-out fixed ${
-            // Turunkan z-index saat modal/dialog terbuka agar overlay & content modal di atas sidebar
-            logoutOpen ? "z-30" : "z-50"
-          } shadow-2xl ${isMobile ? "left-0" : ""}`}
+            : "w-16",
+          // Base layout: saat captureMode (desktop) → absolute; normalnya → fixed
+          captureMode && !isMobile ? "absolute left-0 top-0" : "fixed left-0 top-0",
+          "min-h-screen flex flex-col",
+          "transition-all duration-300 ease-in-out",
+          // Background
+          darkMode
+            ? "bg-slate-900"
+            : "bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-800",
+          "text-white",
+          // Padding
+          sidebarOpen ? "p-3" : "lg:p-3 p-0",
+          // Elevation & stacking
+          sidebarZ,
+          "shadow-2xl",
+          // Scroll (tetap diaktifkan untuk mobile/offcanvas)
+          "overflow-y-auto",
+        ].join(" ")}
+        style={{
+          // Safe area bottom padding (iOS notch)
+          paddingBottom: "env(safe-area-inset-bottom)",
+          // Saat captureMode di desktop, pakai tinggi dokumen supaya sidebar ikut panjang di full-page screenshot
+          height: captureMode && !isMobile ? (docHeight ?? undefined) : undefined,
+        }}
       >
-        {/* Close btn mobile */}
-        {isMobile && sidebarOpen && (
+        {/* Close btn mobile (matikan saat capture mode) */}
+        {isMobile && sidebarOpen && !captureMode && (
           <button
             onClick={() => setSidebarOpen(false)}
             className="absolute right-3 top-3 w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors lg:hidden"
@@ -124,7 +169,7 @@ export function Sidebar() {
             </div>
 
             {/* Toggle close (desktop) */}
-            {!isMobile && sidebarOpen && (
+            {!isMobile && sidebarOpen && !captureMode && (
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="w-6 h-6 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-all duration-200 hover:rotate-90 group"
@@ -160,7 +205,7 @@ export function Sidebar() {
         </div>
 
         {/* Nav utama */}
-        <nav className="space-y-1 flex-1">
+        <nav className={`space-y-1 ${!isMobile ? "flex-1" : ""}`}>
           {MENU.map((m) => {
             const active = isActive(m.href);
             return (
@@ -182,20 +227,15 @@ export function Sidebar() {
                     }`}
                   aria-current={active ? "page" : undefined}
                 >
-                  {/* Hover gradient overlay */}
                   {!active && (
                     <>
                       <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 opacity-0 group-hover:opacity-100 transition-all duration-500" />
                       <div className="absolute inset-0 rounded-lg border border-white/0 group-hover:border-white/30 transition-all duration-300" />
                     </>
                   )}
-
-                  {/* Active glow */}
                   {active && (
                     <div className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5 animate-pulse" />
                   )}
-
-                  {/* Shine sweep */}
                   {!active && (
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/25 to-transparent" />
                   )}
@@ -225,7 +265,12 @@ export function Sidebar() {
         </nav>
 
         {/* Logout */}
-        <div className="mt-3 pt-3 border-t border-white/10">
+        <div
+          className={`${
+            captureMode && !isMobile ? "" : "sticky bottom-3 z-[95]"
+          } mt-3 pt-3 border-t border-white/10 pb-2`}
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
           <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
             <AlertDialogTrigger asChild>
               <button
@@ -250,8 +295,7 @@ export function Sidebar() {
               </button>
             </AlertDialogTrigger>
 
-            {/* Naikkan z-index konten modal, sehingga di atas sidebar/overlay */}
-            <AlertDialogContent className={`${darkMode ? "dark" : ""} z-[70]`}>
+            <AlertDialogContent className={`${darkMode ? "dark" : ""} ${dialogZ}`}>
               <AlertDialogHeader>
                 <AlertDialogTitle>Logout dari QUALITA TMS?</AlertDialogTitle>
                 <AlertDialogDescription>
