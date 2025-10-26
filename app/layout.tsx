@@ -1,28 +1,21 @@
-import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+// app/layout.tsx
 import "./globals.css";
+import { UiProvider } from "@/lib/ui-store";
+import { Plus_Jakarta_Sans } from "next/font/google";
 
-const jakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-jakarta-sans",
+// load seluruh weight yg kamu butuh + set ke CSS variable
+const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600", "700", "800"],
   display: "swap",
+  variable: "--font-jakarta-sans",
+  weight: ["200","300","400","500","600","700","800"],
 });
 
-export const metadata: Metadata = {
-  title: "TMS",
-  description: "TMS",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function Root({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${jakartaSans.variable} antialiased`}>
-        {children}
+    <html lang="en" suppressHydrationWarning className={jakarta.variable}>
+      <body>
+        <UiProvider>{children}</UiProvider>
       </body>
     </html>
   );
