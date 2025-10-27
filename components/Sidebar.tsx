@@ -31,65 +31,48 @@ const MENU: MenuItem[] = [
   { href: "/users", icon: "lucide:users", label: "Users" },
 ];
 
-export function Sidebar() {
-  const { darkMode, sidebarOpen, setSidebarOpen, isMobile } = useUi();
-  const pathname = usePathname();
-  const router = useRouter();
-  const search = useSearchParams();
+type SidebarBodyProps = {
+  sidebarOpen: boolean;
+  isMobile: boolean;
+  darkMode: boolean;
+  logoutOpen: boolean;
+  setSidebarOpen: (v: boolean) => void;
+  isActive: (href: string) => boolean;
+  doLogout: () => Promise<void>;
+  loading: boolean;
+  // mode tampilan: "fixed" (normal) atau "capture" (clone untuk full screenshot)
+  mode: "fixed" | "capture";
+  // z-index strings
+  overlayZ: string;
+  sidebarZ: string;
+  dialogZ: string;
+  // tinggi dokumen (untuk clone)
+  docHeight?: number | null;
+};
 
-  const [logoutOpen, setLogoutOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+function SidebarBody(props: SidebarBodyProps) {
+  const {
+    sidebarOpen,
+    isMobile,
+    darkMode,
+    logoutOpen,
+    setSidebarOpen,
+    isActive,
+    doLogout,
+    loading,
+    mode,
+    overlayZ,
+    sidebarZ,
+    dialogZ,
+    docHeight,
+  } = props;
 
-  // ====== MODE SCREENSHOT ======
-  // Aktifkan dengan menambahkan ?capture=1 pada URL
-  const captureMode = useMemo(() => search?.get("capture") === "1", [search]);
-  const [docHeight, setDocHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!captureMode || isMobile) return;
-    // ukur tinggi dokumen supaya sidebar bisa "ikut panjang" saat full-page screenshot
-    const measure = () =>
-      setDocHeight(
-        Math.max(
-          document.documentElement.scrollHeight,
-          document.body.scrollHeight
-        )
-      );
-    measure();
-    window.addEventListener("resize", measure);
-    // kalau konten dinamis, observer bantu update tinggi
-    const ro = new ResizeObserver(measure);
-    ro.observe(document.documentElement);
-    return () => {
-      window.removeEventListener("resize", measure);
-      ro.disconnect();
-    };
-  }, [captureMode, isMobile]);
-
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
-
-  async function doLogout() {
-    try {
-      setLoading(true);
-      await fetch("/api/logout", { method: "POST" });
-    } finally {
-      setLoading(false);
-      setLogoutOpen(false);
-      router.replace("/login");
-    }
-  }
-
-  // Z-index rules (pastikan sidebar > header saat mobile)
-  const overlayZ = isMobile && sidebarOpen ? "z-[80]" : "z-40";
-  const sidebarZ =
-    isMobile && sidebarOpen ? (logoutOpen ? "z-[100]" : "z-[90]") : logoutOpen ? "z-[60]" : "z-50";
-  const dialogZ = "z-[110]";
+  // pada mode capture (desktop), overlay tidak diperlukan
+  const showOverlay = isMobile && sidebarOpen && mode === "fixed";
 
   return (
     <>
-      {/* Overlay mobile: matikan saat capture mode (biar bersih) */}
-      {isMobile && sidebarOpen && !captureMode && (
+      {showOverlay && (
         <div
           className={`fixed inset-0 bg-black/50 lg:hidden ${overlayZ}`}
           onClick={() => setSidebarOpen(false)}
@@ -106,8 +89,10 @@ export function Sidebar() {
             : sidebarOpen
             ? "w-56"
             : "w-16",
-          // Base layout: saat captureMode (desktop) → absolute; normalnya → fixed
-          captureMode && !isMobile ? "absolute left-0 top-0" : "fixed left-0 top-0",
+          // Posisi:
+          // - mode fixed => fixed
+          // - mode capture (desktop) => absolute supaya ikut panjang dokumen
+          mode === "fixed" ? "fixed left-0 top-0" : "absolute left-0 top-0",
           "min-h-screen flex flex-col",
           "transition-all duration-300 ease-in-out",
           // Background
@@ -124,14 +109,14 @@ export function Sidebar() {
           "overflow-y-auto",
         ].join(" ")}
         style={{
-          // Safe area bottom padding (iOS notch)
           paddingBottom: "env(safe-area-inset-bottom)",
-          // Saat captureMode di desktop, pakai tinggi dokumen supaya sidebar ikut panjang di full-page screenshot
-          height: captureMode && !isMobile ? (docHeight ?? undefined) : undefined,
+          // Saat capture desktop, pakai tinggi dokumen supaya sidebar “full”
+          height: mode === "capture" && !isMobile ? (docHeight ?? undefined) : undefined,
         }}
+        aria-hidden={mode === "capture" ? undefined : undefined}
       >
-        {/* Close btn mobile (matikan saat capture mode) */}
-        {isMobile && sidebarOpen && !captureMode && (
+        {/* Close btn mobile (hanya di mode fixed) */}
+        {isMobile && sidebarOpen && mode === "fixed" && (
           <button
             onClick={() => setSidebarOpen(false)}
             className="absolute right-3 top-3 w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-colors lg:hidden"
@@ -169,7 +154,7 @@ export function Sidebar() {
             </div>
 
             {/* Toggle close (desktop) */}
-            {!isMobile && sidebarOpen && !captureMode && (
+            {!isMobile && sidebarOpen && mode === "fixed" && (
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="w-6 h-6 bg-white/10 rounded-lg flex items-center justify-center hover:bg-white/20 transition-all duration-200 hover:rotate-90 group"
@@ -267,11 +252,15 @@ export function Sidebar() {
         {/* Logout */}
         <div
           className={`${
-            captureMode && !isMobile ? "" : "sticky bottom-3 z-[95]"
+            mode === "fixed" ? "sticky bottom-3 z-[95]" : ""
           } mt-3 pt-3 border-t border-white/10 pb-2`}
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
+          <AlertDialog
+            // di mode capture, jangan buka dialog (tetap render supaya layout sama)
+            open={mode === "fixed" ? undefined : false}
+            onOpenChange={mode === "fixed" ? undefined : () => {}}
+          >
             <AlertDialogTrigger asChild>
               <button
                 title="Logout"
@@ -295,6 +284,7 @@ export function Sidebar() {
               </button>
             </AlertDialogTrigger>
 
+            {/* Dialog di atas overlay & sidebar */}
             <AlertDialogContent className={`${darkMode ? "dark" : ""} ${dialogZ}`}>
               <AlertDialogHeader>
                 <AlertDialogTitle>Logout dari QUALITA TMS?</AlertDialogTitle>
@@ -316,6 +306,100 @@ export function Sidebar() {
           </AlertDialog>
         </div>
       </aside>
+    </>
+  );
+}
+
+export function Sidebar() {
+  const { darkMode, sidebarOpen, setSidebarOpen, isMobile } = useUi();
+  const pathname = usePathname();
+  const router = useRouter();
+  const search = useSearchParams();
+
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const captureMode = useMemo(() => search?.get("capture") === "1", [search]);
+  const [docHeight, setDocHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!captureMode || isMobile) return;
+    const measure = () =>
+      setDocHeight(
+        Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight
+        )
+      );
+    measure();
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    const ro = new ResizeObserver(measure);
+    ro.observe(document.documentElement);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      ro.disconnect();
+    };
+  }, [captureMode, isMobile]);
+
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  async function doLogout() {
+    try {
+      setLoading(true);
+      await fetch("/api/logout", { method: "POST" });
+    } finally {
+      setLoading(false);
+      setLogoutOpen(false);
+      router.replace("/login");
+    }
+  }
+
+  // Z-index rules
+  const overlayZ = isMobile && sidebarOpen ? "z-[80]" : "z-40";
+  const sidebarZ =
+    isMobile && sidebarOpen ? (logoutOpen ? "z-[100]" : "z-[90]") : logoutOpen ? "z-[60]" : "z-50";
+  const dialogZ = "z-[110]";
+
+  return (
+    <>
+      {/* Sidebar normal (fixed). Saat capture desktop, kita sembunyikan supaya tidak double. */}
+      <div className={captureMode && !isMobile ? "hidden" : "contents"}>
+        <SidebarBody
+          mode="fixed"
+          sidebarOpen={sidebarOpen}
+          isMobile={isMobile}
+          darkMode={darkMode}
+          logoutOpen={logoutOpen}
+          setSidebarOpen={setSidebarOpen}
+          isActive={isActive}
+          doLogout={doLogout}
+          loading={loading}
+          overlayZ={overlayZ}
+          sidebarZ={sidebarZ}
+          dialogZ={dialogZ}
+        />
+      </div>
+
+      {/* Sidebar clone untuk full-page screenshot (desktop saja) */}
+      {captureMode && !isMobile && (
+        <SidebarBody
+          mode="capture"
+          sidebarOpen={sidebarOpen}
+          isMobile={false}
+          darkMode={darkMode}
+          logoutOpen={false}
+          setSidebarOpen={() => {}}
+          isActive={isActive}
+          doLogout={async () => {}}
+          loading={false}
+          overlayZ="z-0"
+          sidebarZ="z-[1]"
+          dialogZ="z-[2]"
+          docHeight={docHeight}
+        />
+      )}
     </>
   );
 }
