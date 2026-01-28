@@ -6,6 +6,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { LayoutContent } from "@/components/LayoutContent";
 import { TMSToggle } from "@/components/TMSToggle";
+export const dynamic = "force-dynamic";
+
 
 export const metadata: Metadata = {
   title: "QUALITA TMS",

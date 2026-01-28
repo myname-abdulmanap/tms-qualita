@@ -1,21 +1,30 @@
-// app/api/login/route.ts
 import { NextResponse } from "next/server";
 
+const BACKEND_URL = process.env.BACKEND_URL!;
+
 export async function POST(req: Request) {
-  const { email, pwd, next = "/dashboard" } = await req.json();
+  const { email, pwd } = await req.json();
 
-  // TODO: validasi asli ke backend kamu
-  const ok = Boolean(email) && Boolean(pwd);
-  if (!ok) return NextResponse.json({ error: "Invalid" }, { status: 401 });
+  const res = await fetch(`${BACKEND_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: pwd }),
+  });
 
-  const res = NextResponse.json({ ok: true }, { status: 200 });
-  // cookie sesi dummy 7 hari
-  res.cookies.set("session", "dummy-session-token", {
+  const data = await res.json(); // { token }
+
+  if (!res.ok) {
+    return NextResponse.json({ message: "Login failed" }, { status: 401 });
+  }
+
+  const response = NextResponse.json({ ok: true });
+
+  response.cookies.set("session", data.token, {
     httpOnly: true,
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7,
     path: "/",
+    maxAge: 60 * 60 * 8,
   });
-  // biar fetch() di client bisa redirect setelah router.replace(next)
-  return res;
+
+  return response;
 }

@@ -19,16 +19,69 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-// Tip: pakai nama ikon dari koleksi Iconify (lucide, mdi, solar, dst.)
-// https://icon-sets.iconify.design/
-type MenuItem = { href: string; icon: string; label: string };
+type MenuLeaf = {
+  href: string;
+  icon?: string;
+  label: string;
+  requireSuperAdmin?: boolean;
+};
+
+type MenuItem = {
+  href?: string;
+  icon: string;
+  label: string;
+  children?: MenuLeaf[];
+  requireSuperAdmin?: boolean;
+};
 
 const MENU: MenuItem[] = [
   { href: "/dashboard", icon: "lucide:bar-chart-3", label: "Dashboard" },
-  { href: "/devices", icon: "lucide:box", label: "Devices" },
-  { href: "/stores", icon: "lucide:store", label: "Stores" },
-  { href: "/groups", icon: "lucide:package", label: "Device Groups" },
+  {
+    icon: "lucide:box",
+    label: "Devices",
+    href: "/devices",
+    children: [
+      {
+        href: "/devices",
+        icon: "lucide:layout-dashboard",
+        label: "Device Management",
+      },
+    ],
+  },
+  {
+    icon: "lucide:nfc",
+    label: "Qipay",
+    href: "/qipay",
+    children: [
+      {
+        href: "/qipay",
+        icon: "lucide:radio",
+        label: "Qipay Devices",
+      },
+    ],
+  },
+  { href: "/transactions", icon: "lucide:receipt", label: "Transactions" },
+  { href: "/merchants", icon: "lucide:shopping-cart", label: "Merchants" },
   { href: "/users", icon: "lucide:users", label: "Users" },
+  {
+    href: "/clients",
+    icon: "lucide:building-2",
+    label: "Clients",
+    requireSuperAdmin: true,
+  },
+  {
+    href: "/roles",
+    icon: "lucide:shield",
+    label: "Roles",
+    requireSuperAdmin: true,
+  },
+  {
+    href: "/payment-gateways",
+    icon: "lucide:credit-card",
+    label: "Payment Gateways",
+    requireSuperAdmin: true,
+  },
+  { href: "/profile", icon: "lucide:user-cog", label: "Profil Saya" },
 ];
 
 type SidebarBodyProps = {
@@ -40,14 +93,15 @@ type SidebarBodyProps = {
   isActive: (href: string) => boolean;
   doLogout: () => Promise<void>;
   loading: boolean;
-  // mode tampilan: "fixed" (normal) atau "capture" (clone untuk full screenshot)
+
   mode: "fixed" | "capture";
   // z-index strings
   overlayZ: string;
   sidebarZ: string;
   dialogZ: string;
-  // tinggi dokumen (untuk clone)
+
   docHeight?: number | null;
+  userInfo?: any;
 };
 
 function SidebarBody(props: SidebarBodyProps) {
@@ -65,9 +119,9 @@ function SidebarBody(props: SidebarBodyProps) {
     sidebarZ,
     dialogZ,
     docHeight,
+    userInfo,
   } = props;
 
-  // pada mode capture (desktop), overlay tidak diperlukan
   const showOverlay = isMobile && sidebarOpen && mode === "fixed";
 
   return (
@@ -87,8 +141,8 @@ function SidebarBody(props: SidebarBodyProps) {
               ? "translate-x-0 w-64"
               : "-translate-x-full w-64"
             : sidebarOpen
-            ? "w-56"
-            : "w-16",
+              ? "w-56"
+              : "w-16",
           // Posisi:
           // - mode fixed => fixed
           // - mode capture (desktop) => absolute supaya ikut panjang dokumen
@@ -111,7 +165,10 @@ function SidebarBody(props: SidebarBodyProps) {
         style={{
           paddingBottom: "env(safe-area-inset-bottom)",
           // Saat capture desktop, pakai tinggi dokumen supaya sidebar “full”
-          height: mode === "capture" && !isMobile ? (docHeight ?? undefined) : undefined,
+          height:
+            mode === "capture" && !isMobile
+              ? (docHeight ?? undefined)
+              : undefined,
         }}
         aria-hidden={mode === "capture" ? undefined : undefined}
       >
@@ -168,21 +225,38 @@ function SidebarBody(props: SidebarBodyProps) {
             )}
           </div>
 
-          {(sidebarOpen || isMobile) ? (
+          {sidebarOpen || isMobile ? (
             <div className="flex items-center gap-2.5 p-2.5 rounded-lg bg-white/10 backdrop-blur-sm hover:bg-white/15 transition-all duration-200 cursor-pointer group animate-fadeIn">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                <Icon icon="lucide:user-circle" className="w-5 h-5 text-white" />
+                <Icon
+                  icon="lucide:user-circle"
+                  className="w-5 h-5 text-white"
+                />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-xs truncate">ABDUL M.</p>
-                <p className="text-[10px] text-indigo-200">Administrator</p>
+                <p className="font-semibold text-xs truncate">
+                  {userInfo?.name
+                    ? (console.log("📍 Rendering name:", userInfo.name),
+                      userInfo.name.toUpperCase())
+                    : (console.log(
+                        "📍 userInfo?.name is falsy:",
+                        userInfo?.name,
+                      ),
+                      "LOADING...")}
+                </p>
+                <p className="text-[10px] text-indigo-200">
+                  {userInfo?.roleName || "..."}
+                </p>
               </div>
             </div>
           ) : (
             !isMobile && (
               <div className="flex justify-center">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center hover:scale-110 transition-transform duration-200 cursor-pointer">
-                  <Icon icon="lucide:user-circle" className="w-5 h-5 text-white" />
+                  <Icon
+                    icon="lucide:user-circle"
+                    className="w-5 h-5 text-white"
+                  />
                 </div>
               </div>
             )
@@ -190,64 +264,14 @@ function SidebarBody(props: SidebarBodyProps) {
         </div>
 
         {/* Nav utama */}
-        <nav className={`space-y-1 ${!isMobile ? "flex-1" : ""}`}>
-          {MENU.map((m) => {
-            const active = isActive(m.href);
-            return (
-              <Link
-                key={m.href}
-                href={m.href}
-                className="block"
-                onClick={() => {
-                  if (isMobile) setSidebarOpen(false);
-                }}
-              >
-                <span
-                  className={`relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-300 ease-out group overflow-hidden
-                    ${!sidebarOpen && !isMobile ? "justify-center" : ""}
-                    ${
-                      active
-                        ? "bg-white/25 text-white shadow-lg backdrop-blur-sm scale-[1.02]"
-                        : "text-indigo-100"
-                    }`}
-                  aria-current={active ? "page" : undefined}
-                >
-                  {!active && (
-                    <>
-                      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 opacity-0 group-hover:opacity-100 transition-all duration-500" />
-                      <div className="absolute inset-0 rounded-lg border border-white/0 group-hover:border-white/30 transition-all duration-300" />
-                    </>
-                  )}
-                  {active && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5 animate-pulse" />
-                  )}
-                  {!active && (
-                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-                  )}
-
-                  <Icon
-                    icon={m.icon}
-                    className={`w-[18px] h-[18px] relative z-10 transition-all duration-300 ease-out
-                      ${
-                        active
-                          ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
-                          : "group-hover:scale-125 group-hover:rotate-[8deg] group-hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]"
-                      }`}
-                  />
-
-                  {(sidebarOpen || isMobile) && (
-                    <span
-                      className={`font-medium flex-1 text-left text-xs relative z-10 transition-all duration-300 ease-out
-                        ${!active && "group-hover:translate-x-2 group-hover:text-white"}`}
-                    >
-                      {m.label}
-                    </span>
-                  )}
-                </span>
-              </Link>
-            );
-          })}
-        </nav>
+        <NavMenu
+          menu={MENU}
+          sidebarOpen={sidebarOpen}
+          isMobile={isMobile}
+          isActive={isActive}
+          closeSidebar={() => isMobile && props.setSidebarOpen(false)}
+          userInfo={props.userInfo}
+        />
 
         {/* Logout */}
         <div
@@ -285,11 +309,14 @@ function SidebarBody(props: SidebarBodyProps) {
             </AlertDialogTrigger>
 
             {/* Dialog di atas overlay & sidebar */}
-            <AlertDialogContent className={`${darkMode ? "dark" : ""} ${dialogZ}`}>
+            <AlertDialogContent
+              className={`${darkMode ? "dark" : ""} ${dialogZ}`}
+            >
               <AlertDialogHeader>
                 <AlertDialogTitle>Logout dari QUALITA TMS?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Kamu akan keluar dari sesi saat ini. Kamu bisa login lagi kapan saja.
+                  Kamu akan keluar dari sesi saat ini. Kamu bisa login lagi
+                  kapan saja.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -310,6 +337,242 @@ function SidebarBody(props: SidebarBodyProps) {
   );
 }
 
+// =========================
+// Nav Menu + Dropdown Logic
+// =========================
+function NavMenu({
+  menu,
+  sidebarOpen,
+  isMobile,
+  isActive,
+  closeSidebar,
+  userInfo,
+}: {
+  menu: MenuItem[];
+  sidebarOpen: boolean;
+  isMobile: boolean;
+  isActive: (href: string) => boolean;
+  closeSidebar: () => void;
+  userInfo?: any;
+}) {
+  const pathname = usePathname();
+
+  // Filter menu: hide requireSuperAdmin items if not super admin
+  const isSuperAdmin = !userInfo?.clientId;
+  const filteredMenu = menu.filter((m) => {
+    if (m.requireSuperAdmin && !isSuperAdmin) {
+      return false;
+    }
+    return true;
+  });
+
+  // Buka otomatis dropdown yang match route saat ini
+  const initiallyOpen = useMemo(() => {
+    const open: Record<string, boolean> = {};
+    filteredMenu.forEach((m) => {
+      if (m.children && m.children.length > 0) {
+        const anyActive =
+          (m.href && pathname.startsWith(m.href + "/")) ||
+          m.children.some(
+            (c) => pathname === c.href || pathname.startsWith(c.href + "/"),
+          );
+        if (anyActive) open[m.label] = true;
+      }
+    });
+    return open;
+  }, [filteredMenu, pathname]);
+
+  const [openMap, setOpenMap] =
+    useState<Record<string, boolean>>(initiallyOpen);
+
+  const toggle = (key: string) => setOpenMap((s) => ({ ...s, [key]: !s[key] }));
+
+  return (
+    <nav className={`space-y-1 ${!isMobile ? "flex-1" : ""}`}>
+      {filteredMenu.map((m) => {
+        const active = m.href ? isActive(m.href) : false;
+        const hasChildren = !!m.children?.length;
+        const isOpen = !!openMap[m.label];
+
+        // Jika tidak punya children -> link biasa
+        if (!hasChildren) {
+          return (
+            <Link
+              key={m.href || m.label}
+              href={m.href || "#"}
+              className="block"
+              onClick={closeSidebar}
+            >
+              <MenuRow
+                icon={m.icon}
+                label={m.label}
+                active={active}
+                sidebarOpen={sidebarOpen}
+              />
+            </Link>
+          );
+        }
+
+        // Punya children -> tombol toggle (saat sidebarOpen),
+        // kalau sidebar collapsed, klik parent akan navigate ke href (overview)
+        return (
+          <div key={m.label} className="block">
+            {sidebarOpen ? (
+              <button
+                type="button"
+                aria-expanded={isOpen}
+                onClick={() => toggle(m.label)}
+                className="w-full text-left"
+              >
+                <MenuRow
+                  icon={m.icon}
+                  label={m.label}
+                  active={
+                    // active kalau berada pada subtree
+                    pathname.startsWith((m.href || "") + "/") ||
+                    (m.href ? pathname === m.href : false) ||
+                    m.children!.some(
+                      (c) =>
+                        pathname === c.href ||
+                        pathname.startsWith(c.href + "/"),
+                    )
+                  }
+                  sidebarOpen={sidebarOpen}
+                  withChevron
+                  chevronOpen={isOpen}
+                />
+              </button>
+            ) : (
+              <Link
+                href={m.href || "#"}
+                className="block"
+                onClick={closeSidebar}
+              >
+                <MenuRow
+                  icon={m.icon}
+                  label={m.label}
+                  active={active}
+                  sidebarOpen={sidebarOpen}
+                />
+              </Link>
+            )}
+
+            {/* Children */}
+            {sidebarOpen && (
+              <div
+                className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+                  isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                }`}
+              >
+                <ul className="mt-1 pl-8 pr-2 space-y-1">
+                  {m.children!.map((c) => {
+                    const cActive = isActive(c.href);
+                    return (
+                      <li key={c.href}>
+                        <Link
+                          href={c.href}
+                          onClick={closeSidebar}
+                          className="block"
+                        >
+                          <span
+                            className={`relative w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition-all duration-300 ease-out group overflow-hidden ${
+                              cActive
+                                ? "bg-white/20 text-white shadow backdrop-blur-sm"
+                                : "text-indigo-100"
+                            }`}
+                          >
+                            {c.icon && (
+                              <Icon
+                                icon={c.icon}
+                                className={`w-4 h-4 relative z-10 transition-all duration-300 ease-out ${
+                                  cActive
+                                    ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
+                                    : "group-hover:scale-110 group-hover:rotate-[4deg] group-hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]"
+                                }`}
+                              />
+                            )}
+                            <span className="text-[12px] font-medium">
+                              {c.label}
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+function MenuRow({
+  icon,
+  label,
+  active,
+  sidebarOpen,
+  withChevron,
+  chevronOpen,
+}: {
+  icon: string;
+  label: string;
+  active: boolean;
+  sidebarOpen: boolean;
+  withChevron?: boolean;
+  chevronOpen?: boolean;
+}) {
+  return (
+    <span
+      className={`relative w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-300 ease-out group overflow-hidden ${
+        !sidebarOpen ? "justify-center" : ""
+      } ${active ? "bg-white/25 text-white shadow-lg backdrop-blur-sm scale-[1.02]" : "text-indigo-100"}`}
+      aria-current={active ? "page" : undefined}
+    >
+      {!active && (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/15 to-white/0 opacity-0 group-hover:opacity-100 transition-all duration-500" />
+          <div className="absolute inset-0 rounded-lg border border-white/0 group-hover:border-white/30 transition-all duration-300" />
+        </>
+      )}
+      {active && (
+        <div className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5 animate-pulse" />
+      )}
+      {!active && (
+        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+      )}
+
+      <Icon
+        icon={icon}
+        className={`w-[18px] h-[18px] relative z-10 transition-all duration-300 ease-out ${
+          active
+            ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]"
+            : "group-hover:scale-125 group-hover:rotate-[8deg] group-hover:drop-shadow-[0_2px_8px_rgba(255,255,255,0.4)]"
+        }`}
+      />
+
+      {sidebarOpen && (
+        <span
+          className={`font-medium flex-1 text-left text-xs relative z-10 transition-all duration-300 ease-out ${
+            !active && "group-hover:translate-x-2 group-hover:text-white"
+          }`}
+        >
+          {label}
+        </span>
+      )}
+
+      {withChevron && sidebarOpen && (
+        <Icon
+          icon="lucide:chevron-down"
+          className={`w-4 h-4 mr-1 transition-transform duration-200 ${chevronOpen ? "rotate-180" : "rotate-0"}`}
+        />
+      )}
+    </span>
+  );
+}
+
 export function Sidebar() {
   const { darkMode, sidebarOpen, setSidebarOpen, isMobile } = useUi();
   const pathname = usePathname();
@@ -318,9 +581,39 @@ export function Sidebar() {
 
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [userInfo, setUserInfo] = useState<any>(null);
 
   const captureMode = useMemo(() => search?.get("capture") === "1", [search]);
   const [docHeight, setDocHeight] = useState<number | null>(null);
+
+  // Get user info from JWT
+  useEffect(() => {
+    const getUser = async () => {
+      try {
+        console.log("🔄 Fetching /api/me...");
+        const res = await fetch("/api/me");
+        console.log("📦 /api/me response status:", res.status);
+        const data = await res.json();
+        console.log("👤 User info received:", data);
+        console.log(
+          "👤 Setting state with name:",
+          data.name,
+          "role:",
+          data.roleName,
+        );
+        setUserInfo(data);
+        console.log("✅ State updated with userInfo");
+      } catch (error) {
+        console.error("❌ Error fetching user:", error);
+      }
+    };
+    getUser();
+  }, []);
+
+  // Debug: Monitor userInfo state changes
+  useEffect(() => {
+    console.log("🎯 userInfo state changed:", userInfo);
+  }, [userInfo]);
 
   useEffect(() => {
     if (!captureMode || isMobile) return;
@@ -328,8 +621,8 @@ export function Sidebar() {
       setDocHeight(
         Math.max(
           document.documentElement.scrollHeight,
-          document.body.scrollHeight
-        )
+          document.body.scrollHeight,
+        ),
       );
     measure();
     const onResize = () => measure();
@@ -359,7 +652,13 @@ export function Sidebar() {
   // Z-index rules
   const overlayZ = isMobile && sidebarOpen ? "z-[80]" : "z-40";
   const sidebarZ =
-    isMobile && sidebarOpen ? (logoutOpen ? "z-[100]" : "z-[90]") : logoutOpen ? "z-[60]" : "z-50";
+    isMobile && sidebarOpen
+      ? logoutOpen
+        ? "z-[100]"
+        : "z-[90]"
+      : logoutOpen
+        ? "z-[60]"
+        : "z-50";
   const dialogZ = "z-[110]";
 
   return (
@@ -379,6 +678,7 @@ export function Sidebar() {
           overlayZ={overlayZ}
           sidebarZ={sidebarZ}
           dialogZ={dialogZ}
+          userInfo={userInfo}
         />
       </div>
 
@@ -398,6 +698,7 @@ export function Sidebar() {
           sidebarZ="z-[1]"
           dialogZ="z-[2]"
           docHeight={docHeight}
+          userInfo={userInfo}
         />
       )}
     </>
