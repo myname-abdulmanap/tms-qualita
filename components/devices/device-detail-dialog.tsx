@@ -38,6 +38,7 @@ type Device = {
   network?: string;
   latitude?: number;
   longitude?: number;
+  accuracy?: number; // meters
   locationSource?: string;
   locationUpdatedAt?: string;
   mcc?: number;
@@ -92,6 +93,7 @@ function getLocationSourceLabel(source?: string) {
     GPS: "📍 GPS",
     CELL_TOWER: "📡 Cell Tower",
     WIFI: "📶 WiFi",
+    GOOGLE: "🌐 Google",
     OPENCELLID: "🌐 OpenCellID",
     UNWIREDLABS: "🌐 UnwiredLabs",
     MOZILLA_MLS: "🌐 Mozilla MLS",
@@ -347,6 +349,8 @@ export default function DeviceDetailDialog({
               <DeviceLocationMap
                 latitude={device.latitude}
                 longitude={device.longitude}
+                accuracy={device.accuracy}
+                locationSource={device.locationSource}
                 deviceName={device.deviceCode}
                 className="h-full"
               />
@@ -368,6 +372,17 @@ export default function DeviceDetailDialog({
                 icon="mdi:crosshairs-gps"
                 label="Location Source"
                 value={getLocationSourceLabel(device.locationSource)}
+              />
+              <InfoCard
+                icon="mdi:target"
+                label="Accuracy"
+                value={
+                  device.accuracy
+                    ? device.accuracy >= 1000
+                      ? `~${(device.accuracy / 1000).toFixed(1)} km`
+                      : `~${device.accuracy} m`
+                    : "-"
+                }
               />
               <InfoCard
                 icon="mdi:clock-outline"

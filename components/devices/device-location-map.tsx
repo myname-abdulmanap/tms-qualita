@@ -1,24 +1,143 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LeafletMap = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LeafletMarker = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type LeafletCircle = any;
 
 type DeviceLocationMapProps = {
   latitude?: number;
   longitude?: number;
+  accuracy?: number; // meters
+  locationSource?: string;
   deviceName?: string;
   className?: string;
 };
 
+// Get source display info
+function getSourceInfo(source?: string): { label: string; icon: string; color: string } {
+  const sourceMap: Record<string, { label: string; icon: string; color: string }> = {
+    GPS: { label: "GPS", icon: "📍", color: "#22c55e" },
+    CELL_TOWER: { label: "Cell Tower", icon: "📡", color: "#f59e0b" },
+    WIFI: { label: "WiFi", icon: "📶", color: "#3b82f6" },
+    GOOGLE: { label: "Google", icon: "🌐", color: "#4285f4" },
+    OPENCELLID: { label: "OpenCellID", icon: "🌐", color: "#8b5cf6" },
+    UNWIREDLABS: { label: "UnwiredLabs", icon: "🌐", color: "#8b5cf6" },
+    MOZILLA_MLS: { label: "Mozilla MLS", icon: "🌐", color: "#06b6d4" },
+    FALLBACK_MCC_MNC: { label: "Estimasi (Carrier)", icon: "⚠️", color: "#ef4444" },
+    FALLBACK_COUNTRY: { label: "Estimasi (Negara)", icon: "⚠️", color: "#ef4444" },
+  };
+  return sourceMap[source || ""] || { label: source || "Unknown", icon: "❓", color: "#6b7280" };
+}
+
+// Get accuracy message
+function getAccuracyMessage(locationSource?: string): string {
+  if (!locationSource) return "Data cell tower atau WiFi akan digunakan untuk estimasi lokasi";
+  
+  switch (locationSource) {
+    case "GPS":
+      return "Lokasi dari GPS device (akurasi tinggi)";
+    case "CELL_TOWER":
+    case "OPENCELLID":
+    case "UNWIREDLABS":
+    case "GOOGLE":
+      return "Lokasi di-resolve dari Cell Tower (akurasi sedang)";
+    case "WIFI":
+    case "MOZILLA_MLS":
+      return "Lokasi di-resolve dari WiFi AP (akurasi sedang)";
+    case "FALLBACK_MCC_MNC":
+    case "FALLBACK_COUNTRY":
+      return "Lokasi estimasi dari carrier/negara (akurasi rendah)";
+    default:
+      return "Data cell tower atau WiFi akan digunakan untuk estimasi lokasi";
+  }
+}
+
 export default function DeviceLocationMap({
   latitude,
   longitude,
+  accuracy,
+  locationSource,
   deviceName = "Device",
   className = "",
 }: DeviceLocationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletMap>(null);
+  const markerRef = useRef<LeafletMarker>(null);
+  const circleRef = useRef<LeafletCircle>(null);
+  const initializedRef = useRef(false);
 
+  const sourceInfo = getSourceInfo(locationSource);
+  const hasLocation = latitude && longitude;
+
+  // Initialize map
+  const initMap = useCallback(() => {
+    if (!mapRef.current || mapInstanceRef.current || initializedRef.current) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const L = (window as any).L;
+    if (!L) return;
+
+    initializedRef.current = true;
+
+    // Default ke Indonesia jika tidak ada koordinat
+    const defaultLat = latitude || -6.2088;
+    const defaultLng = longitude || 106.8456;
+    const hasLoc = latitude && longitude;
+
+    mapInstanceRef.current = L.map(mapRef.current).setView(
+      [defaultLat, defaultLng],
+      hasLoc ? 15 : 5,
+    );
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(mapInstanceRef.current);
+
+    if (hasLoc && latitude && longitude) {
+      const popupContent = `
+        <div style="min-width: 150px;">
+          <b>${deviceName}</b><br/>
+          <small style="color: ${sourceInfo.color};">
+            ${sourceInfo.icon} ${sourceInfo.label}
+          </small>
+          <hr style="margin: 4px 0; border-color: #e5e7eb;"/>
+          <span style="font-size: 11px;">
+            📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
+            ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + ' km' : accuracy + ' m'}` : ''}
+          </span>
+        </div>
+      `;
+
+      markerRef.current = L.marker([defaultLat, defaultLng])
+        .addTo(mapInstanceRef.current)
+        .bindPopup(popupContent)
+        .openPopup();
+
+      // Add accuracy circle
+      if (accuracy && accuracy > 0) {
+        circleRef.current = L.circle([defaultLat, defaultLng], {
+          radius: accuracy,
+          color: sourceInfo.color,
+          fillColor: sourceInfo.color,
+          fillOpacity: 0.1,
+          weight: 2,
+        }).addTo(mapInstanceRef.current);
+
+        // Fit bounds to show full circle if large
+        if (accuracy > 100) {
+          mapInstanceRef.current.fitBounds(circleRef.current.getBounds(), { padding: [20, 20] });
+        }
+      }
+    }
+  }, [latitude, longitude, accuracy, deviceName, sourceInfo]);
+
+  // Load Leaflet and initialize map
   useEffect(() => {
     // Load Leaflet CSS
     if (!document.querySelector('link[href*="leaflet.css"]')) {
@@ -30,6 +149,7 @@ export default function DeviceLocationMap({
 
     // Load Leaflet JS
     const loadLeaflet = async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!(window as any).L) {
         await new Promise<void>((resolve) => {
           const script = document.createElement("script");
@@ -48,62 +168,70 @@ export default function DeviceLocationMap({
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+        initializedRef.current = false;
       }
     };
-  }, []);
+  }, [initMap]);
 
+  // Update map when location changes
   useEffect(() => {
     if (mapInstanceRef.current && latitude && longitude) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const L = (window as any).L;
       const latlng = [latitude, longitude];
 
       mapInstanceRef.current.setView(latlng, 15);
 
+      // Update or create marker
+      const popupContent = `
+        <div style="min-width: 150px;">
+          <b>${deviceName}</b><br/>
+          <small style="color: ${sourceInfo.color};">
+            ${sourceInfo.icon} ${sourceInfo.label}
+          </small>
+          <hr style="margin: 4px 0; border-color: #e5e7eb;"/>
+          <span style="font-size: 11px;">
+            📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
+            ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + ' km' : accuracy + ' m'}` : ''}
+          </span>
+        </div>
+      `;
+
       if (markerRef.current) {
         markerRef.current.setLatLng(latlng);
+        markerRef.current.bindPopup(popupContent);
       } else {
         markerRef.current = L.marker(latlng)
           .addTo(mapInstanceRef.current)
-          .bindPopup(
-            `<b>${deviceName}</b><br/>Lat: ${latitude}<br/>Lng: ${longitude}`,
-          )
+          .bindPopup(popupContent)
           .openPopup();
       }
+
+      // Update or create accuracy circle
+      if (accuracy && accuracy > 0) {
+        if (circleRef.current) {
+          circleRef.current.setLatLng(latlng);
+          circleRef.current.setRadius(accuracy);
+        } else {
+          circleRef.current = L.circle(latlng, {
+            radius: accuracy,
+            color: sourceInfo.color,
+            fillColor: sourceInfo.color,
+            fillOpacity: 0.1,
+            weight: 2,
+          }).addTo(mapInstanceRef.current);
+        }
+        
+        // Fit bounds to show full circle
+        if (accuracy > 100) {
+          mapInstanceRef.current.fitBounds(circleRef.current.getBounds(), { padding: [20, 20] });
+        }
+      } else if (circleRef.current) {
+        mapInstanceRef.current.removeLayer(circleRef.current);
+        circleRef.current = null;
+      }
     }
-  }, [latitude, longitude, deviceName]);
-
-  const initMap = () => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-
-    const L = (window as any).L;
-    if (!L) return;
-
-    // Default ke Indonesia jika tidak ada koordinat
-    const defaultLat = latitude || -6.2088;
-    const defaultLng = longitude || 106.8456;
-    const hasLocation = latitude && longitude;
-
-    mapInstanceRef.current = L.map(mapRef.current).setView(
-      [defaultLat, defaultLng],
-      hasLocation ? 15 : 5,
-    );
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(mapInstanceRef.current);
-
-    if (hasLocation) {
-      markerRef.current = L.marker([defaultLat, defaultLng])
-        .addTo(mapInstanceRef.current)
-        .bindPopup(
-          `<b>${deviceName}</b><br/>Lat: ${latitude}<br/>Lng: ${longitude}`,
-        )
-        .openPopup();
-    }
-  };
-
-  const hasLocation = latitude && longitude;
+  }, [latitude, longitude, accuracy, deviceName, sourceInfo]);
 
   return (
     <div className={`relative ${className}`}>
@@ -130,16 +258,26 @@ export default function DeviceLocationMap({
               />
             </svg>
             <p className="text-sm">Lokasi belum tersedia</p>
-            <p className="text-xs mt-1">
-              Data cell tower akan digunakan untuk estimasi lokasi
-            </p>
+            <p className="text-xs mt-1">{getAccuracyMessage(locationSource)}</p>
           </div>
+        </div>
+      )}
+      {/* Source badge overlay */}
+      {hasLocation && locationSource && (
+        <div className="absolute top-2 left-2 z-[1000] bg-white dark:bg-gray-800 rounded-lg shadow-md px-2 py-1 text-xs font-medium flex items-center gap-1">
+          <span>{sourceInfo.icon}</span>
+          <span style={{ color: sourceInfo.color }}>{sourceInfo.label}</span>
+          {accuracy && (
+            <span className="text-gray-400 ml-1">
+              (~{accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + 'km' : accuracy + 'm'})
+            </span>
+          )}
         </div>
       )}
       <div
         ref={mapRef}
         className={`w-full h-full rounded-lg ${!hasLocation ? "opacity-30" : ""}`}
-        style={{ minHeight: "200px" }}
+        style={{ minHeight: 200 }}
       />
     </div>
   );
