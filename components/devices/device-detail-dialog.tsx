@@ -86,6 +86,23 @@ function getBatteryColor(level?: number) {
   return "text-red-500";
 }
 
+function getLocationSourceLabel(source?: string) {
+  if (!source) return "-";
+  const labels: Record<string, string> = {
+    GPS: "📍 GPS",
+    CELL_TOWER: "📡 Cell Tower",
+    WIFI: "📶 WiFi",
+    OPENCELLID: "🌐 OpenCellID",
+    UNWIREDLABS: "🌐 UnwiredLabs",
+    MOZILLA_MLS: "🌐 Mozilla MLS",
+    FALLBACK_MCC_MNC: "⚠️ Estimasi (Carrier)",
+    FALLBACK_COUNTRY: "⚠️ Estimasi (Negara)",
+    IP: "🌐 IP Address",
+    UNKNOWN: "❓ Unknown",
+  };
+  return labels[source] || source;
+}
+
 export default function DeviceDetailDialog({
   open,
   device,
@@ -99,7 +116,8 @@ export default function DeviceDetailDialog({
 
   const online = isOnline(device.lastSeenAt);
   const hasLocation = device.latitude && device.longitude;
-  const hasCellTower = device.mcc || device.mnc || device.lac || device.cellId;
+  // Check if any cell tower data exists (not null/undefined, and not 0 for meaningful values)
+  const hasCellTower = device.mcc !== null && device.mcc !== undefined;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -319,7 +337,7 @@ export default function DeviceDetailDialog({
               <InfoCard
                 icon="mdi:crosshairs-gps"
                 label="Location Source"
-                value={device.locationSource || "CELL_TOWER"}
+                value={getLocationSourceLabel(device.locationSource)}
               />
               <InfoCard
                 icon="mdi:clock-outline"
@@ -340,19 +358,60 @@ export default function DeviceDetailDialog({
                     icon="mdi:broadcast-tower"
                     className="w-5 h-5 text-amber-600 mt-0.5"
                   />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      Cell Tower Triangulation Available
+                      Cell Tower Data
                     </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">
-                      MCC: {device.mcc || 510} | MNC: {device.mnc || 0} | LAC:{" "}
-                      {device.lac || 0} | Cell ID: {device.cellId || 0}
-                    </p>
-                    <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-2">
-                      Lokasi dapat diestimasi menggunakan data cell tower
-                      melalui layanan seperti OpenCellID atau Google Geolocation
-                      API.
-                    </p>
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                      <div className="bg-white dark:bg-gray-800 rounded p-2 text-center">
+                        <p className="text-[10px] text-gray-500">MCC</p>
+                        <p className="text-sm font-mono font-bold">
+                          {device.mcc ?? "-"}
+                        </p>
+                        <p className="text-[9px] text-gray-400">
+                          {device.mcc === 510 ? "Indonesia" : ""}
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded p-2 text-center">
+                        <p className="text-[10px] text-gray-500">MNC</p>
+                        <p className="text-sm font-mono font-bold">
+                          {device.mnc ?? "-"}
+                        </p>
+                        <p className="text-[9px] text-gray-400">
+                          {device.mnc === 10
+                            ? "Telkomsel"
+                            : device.mnc === 11
+                              ? "XL"
+                              : device.mnc === 13
+                                ? "Indosat"
+                                : ""}
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded p-2 text-center">
+                        <p className="text-[10px] text-gray-500">LAC</p>
+                        <p className="text-sm font-mono font-bold">
+                          {device.lac ?? "-"}
+                        </p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-800 rounded p-2 text-center">
+                        <p className="text-[10px] text-gray-500">Cell ID</p>
+                        <p className="text-sm font-mono font-bold">
+                          {device.cellId ?? "-"}
+                        </p>
+                      </div>
+                    </div>
+                    {hasLocation && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                        <Icon icon="mdi:check-circle" className="w-3 h-3" />
+                        Lokasi berhasil di-resolve dari cell tower
+                      </p>
+                    )}
+                    {!hasLocation && (
+                      <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-2">
+                        ⚠️ Koordinat belum tersedia. Backend akan mencoba
+                        resolve dari OpenCellID.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
