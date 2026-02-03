@@ -116,8 +116,12 @@ export default function DeviceDetailDialog({
 
   const online = isOnline(device.lastSeenAt);
   const hasLocation = device.latitude && device.longitude;
-  // Check if any cell tower data exists (not null/undefined, and not 0 for meaningful values)
-  const hasCellTower = device.mcc !== null && device.mcc !== undefined;
+  
+  // Check connection mode
+  const isWifiMode = device.commode?.toUpperCase() === "WIFI";
+  
+  // Check if any cell tower data exists (not null/undefined, and has meaningful values)
+  const hasCellTower = !isWifiMode && device.mcc !== null && device.mcc !== undefined && device.mcc > 0;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -277,7 +281,7 @@ export default function DeviceDetailDialog({
               />
             </div>
 
-            {/* Cell Tower Info */}
+            {/* Cell Tower Info - only show for SIM mode with valid data */}
             {hasCellTower && (
               <div className="mt-4">
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
@@ -305,6 +309,32 @@ export default function DeviceDetailDialog({
                     value={device.cellId}
                     tooltip="Cell Tower ID"
                   />
+                </div>
+              </div>
+            )}
+
+            {/* WiFi Info - show when in WIFI mode */}
+            {isWifiMode && (
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <Icon icon="mdi:wifi" className="w-4 h-4" />
+                  WiFi Connection
+                </h4>
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2">
+                    <Icon icon="mdi:wifi" className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        Connected via WiFi
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-400">
+                        IP: {device.ipAddress || "-"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    ℹ️ Cell tower data tidak tersedia saat menggunakan koneksi WiFi
+                  </p>
                 </div>
               </div>
             )}
@@ -350,7 +380,7 @@ export default function DeviceDetailDialog({
               />
             </div>
 
-            {/* Cell Tower for Location */}
+            {/* Cell Tower for Location - only show for SIM mode */}
             {hasCellTower && (
               <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                 <div className="flex items-start gap-3">
@@ -360,7 +390,7 @@ export default function DeviceDetailDialog({
                   />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                      Cell Tower Data
+                      Cell Tower Data (SIM)
                     </p>
                     <div className="grid grid-cols-4 gap-2 mt-2">
                       <div className="bg-white dark:bg-gray-800 rounded p-2 text-center">
@@ -417,7 +447,42 @@ export default function DeviceDetailDialog({
               </div>
             )}
 
-            {!hasLocation && !hasCellTower && (
+            {/* WiFi Info for Location */}
+            {isWifiMode && (
+              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-start gap-3">
+                  <Icon
+                    icon="mdi:wifi"
+                    className="w-5 h-5 text-blue-600 mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      WiFi Connection
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Icon icon="mdi:ip-network" className="w-4 h-4 text-blue-500" />
+                        <span className="text-gray-600 dark:text-gray-400">IP Address:</span>
+                        <span className="font-mono font-medium">{device.ipAddress || "-"}</span>
+                      </div>
+                    </div>
+                    {hasLocation && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                        <Icon icon="mdi:check-circle" className="w-3 h-3" />
+                        Lokasi berhasil di-resolve dari WiFi Access Points
+                      </p>
+                    )}
+                    {!hasLocation && (
+                      <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-2">
+                        ℹ️ Koordinat akan di-resolve dari MAC address WiFi AP
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!hasLocation && !hasCellTower && !isWifiMode && (
               <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
                 <Icon
                   icon="mdi:map-marker-off"
