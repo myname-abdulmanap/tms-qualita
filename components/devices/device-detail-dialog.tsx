@@ -117,10 +117,23 @@ export default function DeviceDetailDialog({
   if (!device) return null;
 
   const online = isOnline(device.lastSeenAt);
-  const hasLocation = device.latitude && device.longitude;
   
   // Check connection mode
   const isWifiMode = device.commode?.toUpperCase() === "WIFI";
+  
+  // Valid location sources for each mode
+  const wifiValidSources = ["WIFI", "MOZILLA_MLS", "GOOGLE"];
+  const cellValidSources = ["CELL_TOWER", "OPENCELLID", "UNWIREDLABS", "GOOGLE", "FALLBACK_MCC_MNC", "FALLBACK_COUNTRY"];
+  
+  // Check if location source matches current connection mode
+  const isLocationSourceValid = device.locationSource
+    ? isWifiMode
+      ? wifiValidSources.includes(device.locationSource)
+      : cellValidSources.includes(device.locationSource)
+    : false;
+  
+  // Only show location if lat/lng exists AND source matches current mode
+  const hasValidLocation = device.latitude && device.longitude && isLocationSourceValid;
   
   // Check if any cell tower data exists (not null/undefined, and has meaningful values)
   const hasCellTower = !isWifiMode && device.mcc !== null && device.mcc !== undefined && device.mcc > 0;
@@ -344,40 +357,60 @@ export default function DeviceDetailDialog({
 
           {/* ================= TAB: LOCATION ================= */}
           <TabsContent value="location" className="space-y-4 mt-4">
-            {/* Map */}
+            {/* Map - only show if location is valid for current mode */}
             <div className="h-[250px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
               <DeviceLocationMap
-                latitude={device.latitude}
-                longitude={device.longitude}
-                accuracy={device.accuracy}
+                latitude={hasValidLocation ? device.latitude : undefined}
+                longitude={hasValidLocation ? device.longitude : undefined}
+                accuracy={hasValidLocation ? device.accuracy : undefined}
                 locationSource={device.locationSource}
                 deviceName={device.deviceCode}
                 className="h-full"
               />
             </div>
 
+            {/* Source mismatch warning */}
+            {device.latitude && device.longitude && !isLocationSourceValid && (
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <div className="flex items-center gap-2">
+                  <Icon icon="mdi:alert" className="w-5 h-5 text-yellow-600" />
+                  <div>
+                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                      Lokasi belum di-resolve untuk mode {isWifiMode ? "WiFi" : "SIM"}
+                    </p>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                      {isWifiMode
+                        ? "Menunggu data WiFi AP untuk resolve lokasi via Mozilla MLS"
+                        : "Menunggu data Cell Tower untuk resolve lokasi via OpenCellID"
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Location Details */}
             <div className="grid grid-cols-2 gap-4">
               <InfoCard
                 icon="mdi:latitude"
                 label="Latitude"
-                value={device.latitude?.toFixed(6) || "-"}
+                value={hasValidLocation ? device.latitude?.toFixed(6) : "-"}
               />
               <InfoCard
                 icon="mdi:longitude"
                 label="Longitude"
-                value={device.longitude?.toFixed(6) || "-"}
+                value={hasValidLocation ? device.longitude?.toFixed(6) : "-"}
               />
               <InfoCard
                 icon="mdi:crosshairs-gps"
                 label="Location Source"
-                value={getLocationSourceLabel(device.locationSource)}
+                value={hasValidLocation ? getLocationSourceLabel(device.locationSource) : "-"}
               />
               <InfoCard
                 icon="mdi:target"
                 label="Accuracy"
                 value={
-                  device.accuracy
+                  hasValidLocation && device.accuracy
                     ? device.accuracy >= 1000
                       ? `~${(device.accuracy / 1000).toFixed(1)} km`
                       : `~${device.accuracy} m`
@@ -445,13 +478,13 @@ export default function DeviceDetailDialog({
                         </p>
                       </div>
                     </div>
-                    {hasLocation && (
+                    {hasValidLocation && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
                         <Icon icon="mdi:check-circle" className="w-3 h-3" />
                         Lokasi berhasil di-resolve dari cell tower
                       </p>
                     )}
-                    {!hasLocation && (
+                    {!hasValidLocation && (
                       <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-2">
                         ⚠️ Koordinat belum tersedia. Backend akan mencoba
                         resolve dari OpenCellID.
@@ -481,15 +514,15 @@ export default function DeviceDetailDialog({
                         <span className="font-mono font-medium">{device.ipAddress || "-"}</span>
                       </div>
                     </div>
-                    {hasLocation && (
+                    {hasValidLocation && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
                         <Icon icon="mdi:check-circle" className="w-3 h-3" />
-                        Lokasi berhasil di-resolve dari WiFi Access Points
+                        Lokasi berhasil di-resolve dari WiFi Access Points (via {device.locationSource})
                       </p>
                     )}
-                    {!hasLocation && (
+                    {!hasValidLocation && (
                       <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-2">
-                        ℹ️ Koordinat akan di-resolve dari MAC address WiFi AP
+                        ℹ️ Menunggu data WiFi AP untuk resolve lokasi via Mozilla MLS
                       </p>
                     )}
                   </div>
@@ -497,7 +530,7 @@ export default function DeviceDetailDialog({
               </div>
             )}
 
-            {!hasLocation && !hasCellTower && !isWifiMode && (
+            {!hasValidLocation && !hasCellTower && !isWifiMode && (
               <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 text-center">
                 <Icon
                   icon="mdi:map-marker-off"
