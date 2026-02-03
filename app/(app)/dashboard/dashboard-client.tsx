@@ -1,432 +1,564 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Store, CreditCard, TrendingUp, DollarSign } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { Cell, Pie, PieChart, Bar, BarChart, XAxis, YAxis } from "recharts";
 import { useUi } from "@/lib/ui-store";
 import { useRouter } from "next/navigation";
 
-/** ---------- Static gradients map ---------- */
-const STAT_GRADIENTS = {
-  green: "bg-gradient-to-br from-emerald-400 to-teal-500",
-  blue: "bg-gradient-to-br from-blue-400 to-cyan-500",
-  violet: "bg-gradient-to-br from-violet-400 to-purple-500",
-  amber: "bg-gradient-to-br from-amber-400 to-orange-500",
-} as const;
-
-interface DashboardData {
-  merchants: number;
-  devices: number;
-  transactions: number;
-  totalAmount: number;
+interface Device {
+  id: string;
+  deviceCode: string;
+  serialNumber: string;
+  status: string;
+  batteryLevel: number | null;
+  signalStrength: number | null;
+  lastSeenAt: string | null;
+  networkType: string | null;
+  carrier: string | null;
+  merchant?: { name: string } | null;
 }
+
+interface DeviceStats {
+  total: number;
+  online: number;
+  offline: number;
+  lowBattery: number;
+  byNetworkType: { name: string; value: number; color: string }[];
+  byCarrier: { name: string; value: number }[];
+  batteryDistribution: { range: string; count: number; color: string }[];
+}
+
+const ONLINE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 
 export default function DashboardPage() {
   const { darkMode } = useUi();
   const router = useRouter();
-  const [data, setData] = useState<DashboardData>({
-    merchants: 0,
-    devices: 0,
-    transactions: 0,
-    totalAmount: 0,
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [stats, setStats] = useState<DeviceStats>({
+    total: 0,
+    online: 0,
+    offline: 0,
+    lowBattery: 0,
+    byNetworkType: [],
+    byCarrier: [],
+    batteryDistribution: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchDashboardData() {
+    async function fetchDevices() {
       try {
         setLoading(true);
-        const response = await fetch("/api/dashboard");
-        
+        const response = await fetch("/api/devices");
+
         if (response.status === 401) {
           router.push("/login");
           return;
         }
 
         if (!response.ok) {
-          throw new Error("Failed to fetch dashboard data");
+          throw new Error("Failed to fetch devices");
         }
 
-        const result = await response.json();
-        setData(result);
+        const data: Device[] = await response.json();
+        setDevices(data);
+
+        // Calculate stats
+        const now = Date.now();
+        let online = 0;
+        let offline = 0;
+        let lowBattery = 0;
+        const networkTypeCount: Record<string, number> = {};
+        const carrierCount: Record<string, number> = {};
+        const batteryRanges = {
+          "0-20%": 0,
+          "21-50%": 0,
+          "51-80%": 0,
+          "81-100%": 0,
+        };
+
+        data.forEach((device) => {
+          // Online/Offline check
+          const lastSeen = device.lastSeenAt
+            ? new Date(device.lastSeenAt).getTime()
+            : 0;
+          if (now - lastSeen <= ONLINE_THRESHOLD) {
+            online++;
+          } else {
+            offline++;
+          }
+
+          // Low battery check
+          if (device.batteryLevel !== null && device.batteryLevel < 20) {
+            lowBattery++;
+          }
+
+          // Network type count
+          const netType = device.networkType || "Unknown";
+          networkTypeCount[netType] = (networkTypeCount[netType] || 0) + 1;
+
+          // Carrier count
+          const carrier = device.carrier || "Unknown";
+          carrierCount[carrier] = (carrierCount[carrier] || 0) + 1;
+
+          // Battery distribution
+          if (device.batteryLevel !== null) {
+            if (device.batteryLevel <= 20) batteryRanges["0-20%"]++;
+            else if (device.batteryLevel <= 50) batteryRanges["21-50%"]++;
+            else if (device.batteryLevel <= 80) batteryRanges["51-80%"]++;
+            else batteryRanges["81-100%"]++;
+          }
+        });
+
+        const networkColors: Record<string, string> = {
+          "4G": "#3b82f6",
+          LTE: "#6366f1",
+          "3G": "#8b5cf6",
+          "2G": "#a855f7",
+          WiFi: "#06b6d4",
+          Unknown: "#94a3b8",
+        };
+
+        setStats({
+          total: data.length,
+          online,
+          offline,
+          lowBattery,
+          byNetworkType: Object.entries(networkTypeCount).map(
+            ([name, value]) => ({
+              name,
+              value,
+              color: networkColors[name] || "#94a3b8",
+            }),
+          ),
+          byCarrier: Object.entries(carrierCount)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5),
+          batteryDistribution: [
+            { range: "0-20%", count: batteryRanges["0-20%"], color: "#ef4444" },
+            {
+              range: "21-50%",
+              count: batteryRanges["21-50%"],
+              color: "#f59e0b",
+            },
+            {
+              range: "51-80%",
+              count: batteryRanges["51-80%"],
+              color: "#3b82f6",
+            },
+            {
+              range: "81-100%",
+              count: batteryRanges["81-100%"],
+              color: "#10b981",
+            },
+          ],
+        });
+
         setError(null);
       } catch (err) {
-        console.error("Error fetching dashboard data:", err);
+        console.error("Error fetching devices:", err);
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
       }
     }
 
-    fetchDashboardData();
+    fetchDevices();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchDevices, 30000);
+    return () => clearInterval(interval);
   }, [router]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Icon
+          icon="mdi:loading"
+          className="w-8 h-8 animate-spin text-indigo-500"
+        />
+      </div>
+    );
+  }
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("id-ID").format(num);
-  };
+  if (error) {
+    return (
+      <div
+        className={`p-4 rounded-xl ${darkMode ? "bg-red-500/10 text-red-400" : "bg-red-50 text-red-600"}`}
+      >
+        <p className="text-sm">Error: {error}</p>
+      </div>
+    );
+  }
+
+  const statusData = [
+    { name: "Online", value: stats.online, color: "#10b981" },
+    { name: "Offline", value: stats.offline, color: "#ef4444" },
+  ];
 
   return (
-    <div
-      className={`min-h-screen ${
-        darkMode
-          ? "bg-slate-950"
-          : "bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50"
-      } transition-colors duration-300`}
-    >
-      {/* Welcome Card */}
-      <Card
-        className={`${
-          darkMode
-            ? "bg-gradient-to-br from-indigo-600 to-purple-700"
-            : "bg-gradient-to-br from-indigo-500 to-purple-600"
-        } border-0 shadow-xl rounded-3xl mb-6 overflow-hidden`}
-      >
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-3xl font-bold text-white mb-1">
-                Welcome Back,
-              </h2>
-              <h3 className="text-2xl font-semibold text-white/90 mb-3">
-                Admin
-              </h3>
-              <p className="text-sm text-white/70">
-                Terminal Management System | Overview & Analytics
-              </p>
-            </div>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1
+            className={`text-lg font-semibold ${darkMode ? "text-white" : "text-slate-900"}`}
+          >
+            Device Dashboard
+          </h1>
+          <p
+            className={`text-xs ${darkMode ? "text-slate-500" : "text-slate-500"}`}
+          >
+            Real-time monitoring perangkat terminal
+          </p>
+        </div>
+        <div
+          className={`flex items-center gap-2 text-xs ${darkMode ? "text-slate-500" : "text-slate-400"}`}
+        >
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          Live
+        </div>
+      </div>
 
-            <div className="relative w-[100px] h-[100px]">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width={100}
-                height={100}
-                viewBox="0 0 40 40"
-              >
-                <g fill="none">
-                  <g clipPath="url(#SVGw9scfcdR)">
-                    <path
-                      fill="#00034a"
-                      stroke="#00034a"
-                      strokeMiterlimit={10}
-                      d="M31.967 2.682c-.441-.484-1.584-.162-2.553.72c-.969.883-1.396 1.99-.955 2.475c.26.286.387.434.648.72c.44.485 1.584.162 2.552-.72c.969-.882 1.396-1.99.955-2.474c-.26-.287-.387-.435-.647-.721Zm.396 4.93c-1.257.37-2.126 1.18-1.94 1.809c.379 1.287 1.885 1.462 3.075 1.11c1.257-.37 2.126-1.179 1.94-1.807c-.383-1.3-1.955-1.442-3.075-1.112Z"
-                      strokeWidth={1}
-                    />
-                    <path
-                      fill="#00034a"
-                      stroke="#00034a"
-                      strokeLinecap="round"
-                      strokeMiterlimit={10}
-                      d="M34.276 13.098c-.826 0-1.497.67-1.497 1.498c0 .934 1.37 2.314 2.305 2.314c.827 0 1.497-.67 1.497-1.498c0-.934-1.37-2.314-2.305-2.314Z"
-                      strokeWidth={1}
-                    />
-                    <path
-                      fill="#9bff00"
-                      stroke="#00034a"
-                      strokeMiterlimit={10}
-                      d="M29.182 12.214a2.73 2.73 0 0 0-2.158-1.38a3.1 3.1 0 0 0-1.352.223a8.98 8.98 0 0 0-3.432-7.03c.185-.3.32-.628.399-.972a1.36 1.36 0 0 0-.564-1.303a1.35 1.35 0 0 0-1.42 0c-.315.26-.587.57-.806.914a13.6 13.6 0 0 0-3.578-.777a13.2 13.2 0 0 0-3.685.252a4 4 0 0 0-.632-1.089a1.33 1.33 0 0 0-1.39-.291a1.36 1.36 0 0 0-.827 1.186c.024.35.103.695.234 1.02a9 9 0 0 0-4.59 6.32A3.2 3.2 0 0 0 4.09 8.84a2.7 2.7 0 0 0-2.363.972c-.476.554-.817 3.578-.972 5.834s-.389 5.337 0 5.96a2.65 2.65 0 0 0 2.178 1.429c.468.031.937-.046 1.37-.224c-.106.955.066 1.92.496 2.78c.361.482.876.825 1.459.973a9.2 9.2 0 0 0 .223 3.364a3.08 3.08 0 0 0 2.47 1.546a3.09 3.09 0 0 0 2.693-1.09c.397-.815.635-1.7.7-2.605l1.682.165l1.682.127a7.1 7.1 0 0 0 .233 2.683a3.208 3.208 0 0 0 5.173.457a9.3 9.3 0 0 0 .797-3.276a2.65 2.65 0 0 0 1.604-.749a4.86 4.86 0 0 0 .972-2.654c.394.252.839.411 1.303.466a2.7 2.7 0 0 0 2.372-.972c.467-.554.817-3.587.972-5.833s.399-5.357.049-5.98z"
-                      strokeWidth={1}
-                    />
-                  </g>
-                  <defs>
-                    <clipPath id="SVGw9scfcdR">
-                      <path fill="#fff" d="M0 0h40v40H0z" />
-                    </clipPath>
-                  </defs>
-                </g>
-              </svg>
+      {/* Main Stats - Colorful Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card className="bg-gradient-to-br from-indigo-500 to-indigo-600 border-0 shadow-lg shadow-indigo-500/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-indigo-100 text-xs font-medium">
+                  Total Device
+                </p>
+                <p className="text-white text-2xl font-bold mt-1">
+                  {stats.total}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Icon icon="mdi:devices" className="w-5 h-5 text-white" />
+              </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-0 shadow-lg shadow-emerald-500/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-emerald-100 text-xs font-medium">Online</p>
+                <p className="text-white text-2xl font-bold mt-1">
+                  {stats.online}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Icon icon="mdi:wifi" className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1">
+              <span className="text-emerald-100 text-[10px]">
+                {stats.total > 0
+                  ? ((stats.online / stats.total) * 100).toFixed(0)
+                  : 0}
+                % dari total
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-rose-500 to-rose-600 border-0 shadow-lg shadow-rose-500/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-rose-100 text-xs font-medium">Offline</p>
+                <p className="text-white text-2xl font-bold mt-1">
+                  {stats.offline}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Icon icon="mdi:wifi-off" className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1">
+              <span className="text-rose-100 text-[10px]">
+                {stats.total > 0
+                  ? ((stats.offline / stats.total) * 100).toFixed(0)
+                  : 0}
+                % dari total
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-500 to-amber-600 border-0 shadow-lg shadow-amber-500/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-amber-100 text-xs font-medium">
+                  Low Battery
+                </p>
+                <p className="text-white text-2xl font-bold mt-1">
+                  {stats.lowBattery}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                <Icon icon="mdi:battery-alert" className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1">
+              <span className="text-amber-100 text-[10px]">
+                Battery &lt; 20%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Device Status Pie */}
+        <Card
+          className={`${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+        >
+          <CardHeader className="pb-0 pt-4 px-4">
+            <CardTitle
+              className={`text-sm font-medium ${darkMode ? "text-slate-200" : "text-slate-700"}`}
+            >
+              Status Device
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 pb-4">
+            <ChartContainer
+              config={{
+                online: { label: "Online", color: "#10b981" },
+                offline: { label: "Offline", color: "#ef4444" },
+              }}
+              className="h-[140px] w-full"
+            >
+              <PieChart>
+                <Pie
+                  data={statusData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {statusData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </PieChart>
+            </ChartContainer>
+            <div className="flex justify-center gap-6 -mt-2">
+              {statusData.map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span
+                    className={`text-xs ${darkMode ? "text-slate-400" : "text-slate-600"}`}
+                  >
+                    {item.name}: {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Network Type */}
+        <Card
+          className={`${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+        >
+          <CardHeader className="pb-0 pt-4 px-4">
+            <CardTitle
+              className={`text-sm font-medium ${darkMode ? "text-slate-200" : "text-slate-700"}`}
+            >
+              Tipe Jaringan
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 pb-4">
+            <ChartContainer
+              config={{
+                value: { label: "Devices", color: "#6366f1" },
+              }}
+              className="h-[140px] w-full"
+            >
+              <PieChart>
+                <Pie
+                  data={stats.byNetworkType}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={60}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {stats.byNetworkType.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <ChartTooltip content={<ChartTooltipContent />} />
+              </PieChart>
+            </ChartContainer>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 -mt-2">
+              {stats.byNetworkType.map((item) => (
+                <div key={item.name} className="flex items-center gap-1.5">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span
+                    className={`text-[10px] ${darkMode ? "text-slate-400" : "text-slate-600"}`}
+                  >
+                    {item.name}: {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Battery Distribution */}
+        <Card
+          className={`${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+        >
+          <CardHeader className="pb-0 pt-4 px-4">
+            <CardTitle
+              className={`text-sm font-medium ${darkMode ? "text-slate-200" : "text-slate-700"}`}
+            >
+              Distribusi Baterai
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-2 pb-4">
+            <ChartContainer
+              config={{
+                count: { label: "Devices", color: "#6366f1" },
+              }}
+              className="h-[130px] w-full"
+            >
+              <BarChart
+                data={stats.batteryDistribution}
+                layout="vertical"
+                margin={{ left: 0, right: 10 }}
+              >
+                <XAxis type="number" hide />
+                <YAxis
+                  dataKey="range"
+                  type="category"
+                  tick={{
+                    fontSize: 10,
+                    fill: darkMode ? "#94a3b8" : "#64748b",
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={50}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                  {stats.batteryDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Devices List */}
+      <Card
+        className={`${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+      >
+        <CardHeader className="pb-2 pt-4 px-4">
+          <div className="flex items-center justify-between">
+            <CardTitle
+              className={`text-sm font-medium ${darkMode ? "text-slate-200" : "text-slate-700"}`}
+            >
+              Device Terbaru
+            </CardTitle>
+            <button
+              onClick={() => router.push("/devices")}
+              className={`text-xs ${darkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
+            >
+              Lihat Semua →
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 pb-3 px-4">
+          <div className="space-y-2">
+            {devices.slice(0, 5).map((device) => {
+              const isOnline =
+                device.lastSeenAt &&
+                Date.now() - new Date(device.lastSeenAt).getTime() <=
+                  ONLINE_THRESHOLD;
+              return (
+                <div
+                  key={device.id}
+                  className={`flex items-center justify-between p-2.5 rounded-lg ${darkMode ? "bg-slate-800/50" : "bg-slate-50"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center ${isOnline ? "bg-emerald-500/10" : "bg-slate-500/10"}`}
+                    >
+                      <Icon
+                        icon="mdi:cellphone-nfc"
+                        className={`w-4 h-4 ${isOnline ? "text-emerald-500" : "text-slate-400"}`}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className={`text-xs font-medium ${darkMode ? "text-white" : "text-slate-900"}`}
+                      >
+                        {device.deviceCode}
+                      </p>
+                      <p
+                        className={`text-[10px] ${darkMode ? "text-slate-500" : "text-slate-500"}`}
+                      >
+                        {device.serialNumber}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {device.batteryLevel !== null && (
+                      <div className="flex items-center gap-1">
+                        <Icon
+                          icon={
+                            device.batteryLevel > 20
+                              ? "mdi:battery"
+                              : "mdi:battery-alert"
+                          }
+                          className={`w-3.5 h-3.5 ${device.batteryLevel > 20 ? "text-emerald-500" : "text-amber-500"}`}
+                        />
+                        <span
+                          className={`text-[10px] ${darkMode ? "text-slate-400" : "text-slate-600"}`}
+                        >
+                          {device.batteryLevel}%
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${isOnline ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-500/10 text-slate-400"}`}
+                    >
+                      {isOnline ? "Online" : "Offline"}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && !loading && (
-        <Card
-          className={`${
-            darkMode ? "bg-red-900/20 border-red-700" : "bg-red-50 border-red-200"
-          } border-2`}
-        >
-          <CardContent className="p-6">
-            <p
-              className={`text-center ${
-                darkMode ? "text-red-300" : "text-red-600"
-              }`}
-            >
-              Error loading dashboard data: {error}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Stats Cards */}
-      {!loading && !error && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard
-              dark={darkMode}
-              title="Total Merchants"
-              tag="@registered"
-              value={formatNumber(data.merchants)}
-              icon={Store}
-              variant="green"
-            />
-            <StatCard
-              dark={darkMode}
-              title="Active Devices"
-              tag="@connected"
-              value={formatNumber(data.devices)}
-              icon={CreditCard}
-              variant="blue"
-            />
-            <StatCard
-              dark={darkMode}
-              title="Transactions"
-              tag="@processed"
-              value={formatNumber(data.transactions)}
-              icon={TrendingUp}
-              variant="violet"
-            />
-            <StatCard
-              dark={darkMode}
-              title="Total Revenue"
-              tag="@amount"
-              value={formatCurrency(data.totalAmount)}
-              icon={DollarSign}
-              variant="amber"
-            />
-          </div>
-
-          {/* Summary Card */}
-          <Card
-            className={`${
-              darkMode
-                ? "bg-slate-800 border-slate-700"
-                : "bg-white border-slate-200"
-            } shadow-lg hover:shadow-xl transition-all duration-300`}
-          >
-            <CardHeader>
-              <CardTitle
-                className={`${
-                  darkMode ? "text-white" : "text-slate-900"
-                } text-xl`}
-              >
-                System Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <SummaryItem
-                  dark={darkMode}
-                  label="Merchants"
-                  value={formatNumber(data.merchants)}
-                  description="Total registered merchants"
-                  color="green"
-                />
-                <SummaryItem
-                  dark={darkMode}
-                  label="Devices"
-                  value={formatNumber(data.devices)}
-                  description="Active EDC terminals"
-                  color="blue"
-                />
-                <SummaryItem
-                  dark={darkMode}
-                  label="Transactions"
-                  value={formatNumber(data.transactions)}
-                  description="Total processed"
-                  color="violet"
-                />
-                <SummaryItem
-                  dark={darkMode}
-                  label="Revenue"
-                  value={formatCurrency(data.totalAmount)}
-                  description="Total amount"
-                  color="amber"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
-            <QuickStatCard
-              dark={darkMode}
-              title="Average Transaction"
-              value={
-                data.transactions > 0
-                  ? formatCurrency(data.totalAmount / data.transactions)
-                  : formatCurrency(0)
-              }
-              trend="+12.5%"
-              trendUp={true}
-            />
-            <QuickStatCard
-              dark={darkMode}
-              title="Devices per Merchant"
-              value={(data.merchants > 0
-                ? (data.devices / data.merchants).toFixed(1)
-                : "0.0"
-              )}
-              trend="+5.2%"
-              trendUp={true}
-            />
-            <QuickStatCard
-              dark={darkMode}
-              title="Transactions per Device"
-              value={(data.devices > 0
-                ? (data.transactions / data.devices).toFixed(1)
-                : "0.0"
-              )}
-              trend="+8.3%"
-              trendUp={true}
-            />
-          </div>
-        </>
-      )}
     </div>
-  );
-}
-
-/** ---------- Components ---------- */
-function StatCard({
-  dark,
-  title,
-  tag,
-  value,
-  icon: Icon,
-  variant = "green",
-}: {
-  dark: boolean;
-  title: string;
-  tag: string;
-  value: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  variant?: keyof typeof STAT_GRADIENTS;
-}) {
-  const gradient = STAT_GRADIENTS[variant] ?? STAT_GRADIENTS.green;
-
-  return (
-    <Card
-      className={`${gradient} border-0 shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 cursor-pointer group rounded-2xl`}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300">
-            <Icon className="w-6 h-6 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-xs font-semibold text-white/90 mb-0.5">
-              {title}
-            </h3>
-            <p className="text-xs text-white/60">{tag}</p>
-          </div>
-        </div>
-        <p className="text-2xl font-bold text-white mt-3 truncate">{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SummaryItem({
-  dark,
-  label,
-  value,
-  description,
-  color,
-}: {
-  dark: boolean;
-  label: string;
-  value: string;
-  description: string;
-  color: "green" | "blue" | "violet" | "amber";
-}) {
-  const colorClasses = {
-    green: "text-emerald-600 dark:text-emerald-400",
-    blue: "text-blue-600 dark:text-blue-400",
-    violet: "text-violet-600 dark:text-violet-400",
-    amber: "text-amber-600 dark:text-amber-400",
-  };
-
-  return (
-    <div className="space-y-2">
-      <p
-        className={`text-sm font-medium ${
-          dark ? "text-slate-400" : "text-slate-600"
-        }`}
-      >
-        {label}
-      </p>
-      <p className={`text-2xl font-bold ${colorClasses[color]}`}>{value}</p>
-      <p
-        className={`text-xs ${dark ? "text-slate-500" : "text-slate-500"}`}
-      >
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function QuickStatCard({
-  dark,
-  title,
-  value,
-  trend,
-  trendUp,
-}: {
-  dark: boolean;
-  title: string;
-  value: string;
-  trend: string;
-  trendUp: boolean;
-}) {
-  return (
-    <Card
-      className={`${
-        dark ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"
-      } shadow-md hover:shadow-lg transition-all duration-300`}
-    >
-      <CardContent className="p-4">
-        <p
-          className={`text-sm font-medium mb-2 ${
-            dark ? "text-slate-400" : "text-slate-600"
-          }`}
-        >
-          {title}
-        </p>
-        <div className="flex items-end justify-between">
-          <p
-            className={`text-2xl font-bold ${
-              dark ? "text-white" : "text-slate-900"
-            }`}
-          >
-            {value}
-          </p>
-          <span
-            className={`text-sm font-semibold ${
-              trendUp ? "text-green-600" : "text-red-600"
-            }`}
-          >
-            {trend}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

@@ -1,8 +1,9 @@
 // components/Header.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { Menu, Bell, Calendar, Moon, Sun, Clock } from "lucide-react";
+import { Menu, Calendar, Moon, Sun, Clock } from "lucide-react";
 import { useUi } from "@/lib/ui-store";
+import NotificationBell from "@/components/NotificationBell";
 
 export function Header() {
   const { darkMode, setDarkMode, isMobile, setSidebarOpen } = useUi();
@@ -92,15 +93,7 @@ export function Header() {
             </>
           )}
 
-          <button
-            className={`p-1.5 rounded-lg ${darkMode ? "hover:bg-slate-800" : "hover:bg-slate-100"} transition-all hover:scale-110 duration-200 relative group`}
-            aria-label="Notifications"
-          >
-            <Bell
-              className={`w-[18px] h-[18px] ${darkMode ? "text-slate-300" : "text-slate-600"} group-hover:rotate-12 transition-transform duration-200`}
-            />
-            <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-          </button>
+          <NotificationBell variant="header" darkMode={darkMode} />
 
           <button
             onClick={() => setDarkMode(!darkMode)}

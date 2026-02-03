@@ -1,38 +1,25 @@
 import ReceiptClient from "./receipt-client";
 
-interface ReceiptPageProps {
-  params: {
-    code: string;
-  };
-}
-
-export default async function ReceiptPage({ params }: ReceiptPageProps) {
-  const { code } = params;
-
-  let trx: any = null;
-  let error: string | null = null;
-
+export default async function ReceiptPage({ params }) {
+  const resolvedParams = await params;
+  
+  // Fetch transaction data
+  let trx = null;
+  let error = null;
+  
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL}/api/receipt/${code}`,
-      { cache: "no-store" }
-    );
-
+    const apiUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/receipt/${resolvedParams.code}`;
+    const res = await fetch(apiUrl, { cache: "no-store" });
+    
     if (res.ok) {
       const json = await res.json();
       trx = json.data;
     } else {
       error = `API returned status ${res.status}`;
     }
-  } catch (err: any) {
-    error = err.message || "Unknown error";
+  } catch (err) {
+    error = err.message;
   }
 
-  return (
-    <ReceiptClient
-      trx={trx}
-      error={error}
-      code={code}
-    />
-  );
+  return <ReceiptClient trx={trx} error={error} code={resolvedParams.code} />;
 }

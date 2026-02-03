@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@iconify/react";
+import Link from "next/link";
 import DeviceDialog from "./device-dialog";
+import DeviceDetailDialog from "./device-detail-dialog";
 
 type Device = {
   id: string;
@@ -33,6 +35,8 @@ export default function DeviceTable() {
   const [editDevice, setEditDevice] = useState<Device | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailDevice, setDetailDevice] = useState<Device | null>(null);
 
   useEffect(() => {
     loadCurrentUser();
@@ -140,11 +144,19 @@ export default function DeviceTable() {
             {devices.length} device{devices.length !== 1 ? "s" : ""} total
           </p>
         </div>
-        {!currentUser?.merchantId && (
-          <Button onClick={handleAdd}>
-            <Icon icon="mdi:plus" className="mr-1" /> Add Device
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <Link href="/devices/map">
+            <Button variant="outline">
+              <Icon icon="mdi:map-marker-multiple" className="mr-1 w-4 h-4" />{" "}
+              Map View
+            </Button>
+          </Link>
+          {!currentUser?.merchantId && (
+            <Button onClick={handleAdd}>
+              <Icon icon="mdi:plus" className="mr-1" /> Add Device
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -213,6 +225,17 @@ export default function DeviceTable() {
                           <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => {
+                              setDetailDevice(device);
+                              setDetailOpen(true);
+                            }}
+                          >
+                            <Icon icon="mdi:eye" className="w-4 h-4" />
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => handleEdit(device)}
                             className="dark:text-white dark:border-gray-600 dark:hover:bg-slate-700"
                           >
@@ -236,6 +259,15 @@ export default function DeviceTable() {
           </table>
         </div>
       )}
+
+      <DeviceDetailDialog
+        open={detailOpen}
+        device={detailDevice}
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailDevice(null);
+        }}
+      />
 
       <DeviceDialog
         open={open}

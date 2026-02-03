@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import TransactionTable from "@/components/transactions/transaction-table";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 
 export default async function TransactionsPage() {
