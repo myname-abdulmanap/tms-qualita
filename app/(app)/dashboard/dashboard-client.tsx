@@ -18,9 +18,9 @@ interface Device {
   serialNumber: string;
   status: string;
   batteryLevel: number | null;
-  signalStrength: number | null;
+  signal: number | null;
   lastSeenAt: string | null;
-  networkType: string | null;
+  commode: string | null;
   carrier: string | null;
   merchant?: { name: string } | null;
 }
@@ -102,7 +102,7 @@ export default function DashboardPage() {
           }
 
           // Network type count
-          const netType = device.networkType || "Unknown";
+          const netType = device.commode || "Unknown";
           networkTypeCount[netType] = (networkTypeCount[netType] || 0) + 1;
 
           // Carrier count
@@ -123,7 +123,11 @@ export default function DashboardPage() {
           LTE: "#6366f1",
           "3G": "#8b5cf6",
           "2G": "#a855f7",
+          WIFI: "#06b6d4",
           WiFi: "#06b6d4",
+          SIM: "#10b981",
+          GSM: "#f59e0b",
+          WCDMA: "#8b5cf6",
           Unknown: "#94a3b8",
         };
 
