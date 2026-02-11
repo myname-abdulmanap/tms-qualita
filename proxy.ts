@@ -16,9 +16,10 @@ export default function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const isLoginPage = pathname.startsWith("/login");
   const is403Page = pathname.startsWith("/403");
+  const isReceiptPage = pathname.startsWith("/receipt");
 
-  // 1. Not logged in → redirect to login (except login & 403 pages)
-  if (!token && !isLoginPage && !is403Page) {
+  // 1. Not logged in → redirect to login (except login, 403 & receipt pages)
+  if (!token && !isLoginPage && !is403Page && !isReceiptPage) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -95,6 +96,6 @@ export default function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|receipt).*)",
   ],
 };
