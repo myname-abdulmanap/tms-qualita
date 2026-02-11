@@ -117,26 +117,38 @@ export default function DeviceDetailDialog({
   if (!device) return null;
 
   const online = isOnline(device.lastSeenAt);
-  
+
   // Check connection mode
   const isWifiMode = device.commode?.toUpperCase() === "WIFI";
-  
+
   // Valid location sources for each mode
   const wifiValidSources = ["WIFI", "MOZILLA_MLS", "GOOGLE"];
-  const cellValidSources = ["CELL_TOWER", "OPENCELLID", "UNWIREDLABS", "GOOGLE", "FALLBACK_MCC_MNC", "FALLBACK_COUNTRY"];
-  
+  const cellValidSources = [
+    "CELL_TOWER",
+    "OPENCELLID",
+    "UNWIREDLABS",
+    "GOOGLE",
+    "FALLBACK_MCC_MNC",
+    "FALLBACK_COUNTRY",
+  ];
+
   // Check if location source matches current connection mode
   const isLocationSourceValid = device.locationSource
     ? isWifiMode
       ? wifiValidSources.includes(device.locationSource)
       : cellValidSources.includes(device.locationSource)
     : false;
-  
+
   // Only show location if lat/lng exists AND source matches current mode
-  const hasValidLocation = device.latitude && device.longitude && isLocationSourceValid;
-  
+  const hasValidLocation =
+    device.latitude && device.longitude && isLocationSourceValid;
+
   // Check if any cell tower data exists (not null/undefined, and has meaningful values)
-  const hasCellTower = !isWifiMode && device.mcc !== null && device.mcc !== undefined && device.mcc > 0;
+  const hasCellTower =
+    !isWifiMode &&
+    device.mcc !== null &&
+    device.mcc !== undefined &&
+    device.mcc > 0;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -348,7 +360,8 @@ export default function DeviceDetailDialog({
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    ℹ️ Cell tower data tidak tersedia saat menggunakan koneksi WiFi
+                    ℹ️ Cell tower data tidak tersedia saat menggunakan koneksi
+                    WiFi
                   </p>
                 </div>
               </div>
@@ -376,13 +389,13 @@ export default function DeviceDetailDialog({
                   <Icon icon="mdi:alert" className="w-5 h-5 text-yellow-600" />
                   <div>
                     <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                      Lokasi belum di-resolve untuk mode {isWifiMode ? "WiFi" : "SIM"}
+                      Lokasi belum di-resolve untuk mode{" "}
+                      {isWifiMode ? "WiFi" : "SIM"}
                     </p>
                     <p className="text-xs text-yellow-600 dark:text-yellow-400">
                       {isWifiMode
                         ? "Menunggu data WiFi AP untuk resolve lokasi via Mozilla MLS"
-                        : "Menunggu data Cell Tower untuk resolve lokasi via OpenCellID"
-                      }
+                        : "Menunggu data Cell Tower untuk resolve lokasi via OpenCellID"}
                     </p>
                   </div>
                 </div>
@@ -404,7 +417,11 @@ export default function DeviceDetailDialog({
               <InfoCard
                 icon="mdi:crosshairs-gps"
                 label="Location Source"
-                value={hasValidLocation ? getLocationSourceLabel(device.locationSource) : "-"}
+                value={
+                  hasValidLocation
+                    ? getLocationSourceLabel(device.locationSource)
+                    : "-"
+                }
               />
               <InfoCard
                 icon="mdi:target"
@@ -509,20 +526,29 @@ export default function DeviceDetailDialog({
                     </p>
                     <div className="mt-2 space-y-1">
                       <div className="flex items-center gap-2 text-sm">
-                        <Icon icon="mdi:ip-network" className="w-4 h-4 text-blue-500" />
-                        <span className="text-gray-600 dark:text-gray-400">IP Address:</span>
-                        <span className="font-mono font-medium">{device.ipAddress || "-"}</span>
+                        <Icon
+                          icon="mdi:ip-network"
+                          className="w-4 h-4 text-blue-500"
+                        />
+                        <span className="text-gray-600 dark:text-gray-400">
+                          IP Address:
+                        </span>
+                        <span className="font-mono font-medium">
+                          {device.ipAddress || "-"}
+                        </span>
                       </div>
                     </div>
                     {hasValidLocation && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
                         <Icon icon="mdi:check-circle" className="w-3 h-3" />
-                        Lokasi berhasil di-resolve dari WiFi Access Points (via {device.locationSource})
+                        Lokasi berhasil di-resolve dari WiFi Access Points (via{" "}
+                        {device.locationSource})
                       </p>
                     )}
                     {!hasValidLocation && (
                       <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-2">
-                        ℹ️ Menunggu data WiFi AP untuk resolve lokasi via Mozilla MLS
+                        ℹ️ Menunggu data WiFi AP untuk resolve lokasi via
+                        Mozilla MLS
                       </p>
                     )}
                   </div>

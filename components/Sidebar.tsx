@@ -61,6 +61,16 @@ const MENU: MenuItem[] = [
     ],
   },
   { href: "/transactions", icon: "lucide:receipt", label: "Transactions" },
+  {
+    href: "/settlements",
+    icon: "lucide:landmark",
+    label: "Settlement & Saldo",
+  },
+  {
+    href: "/ota",
+    icon: "lucide:cloud-download",
+    label: "OTA Update",
+  },
   { href: "/merchants", icon: "lucide:shopping-cart", label: "Merchants" },
   { href: "/users", icon: "lucide:users", label: "Users" },
   {

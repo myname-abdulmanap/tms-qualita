@@ -19,8 +19,15 @@ type DeviceLocationMapProps = {
 };
 
 // Get source display info
-function getSourceInfo(source?: string): { label: string; icon: string; color: string } {
-  const sourceMap: Record<string, { label: string; icon: string; color: string }> = {
+function getSourceInfo(source?: string): {
+  label: string;
+  icon: string;
+  color: string;
+} {
+  const sourceMap: Record<
+    string,
+    { label: string; icon: string; color: string }
+  > = {
     GPS: { label: "GPS", icon: "📍", color: "#22c55e" },
     CELL_TOWER: { label: "Cell Tower", icon: "📡", color: "#f59e0b" },
     WIFI: { label: "WiFi", icon: "📶", color: "#3b82f6" },
@@ -28,16 +35,31 @@ function getSourceInfo(source?: string): { label: string; icon: string; color: s
     OPENCELLID: { label: "OpenCellID", icon: "🌐", color: "#8b5cf6" },
     UNWIREDLABS: { label: "UnwiredLabs", icon: "🌐", color: "#8b5cf6" },
     MOZILLA_MLS: { label: "Mozilla MLS", icon: "🌐", color: "#06b6d4" },
-    FALLBACK_MCC_MNC: { label: "Estimasi (Carrier)", icon: "⚠️", color: "#ef4444" },
-    FALLBACK_COUNTRY: { label: "Estimasi (Negara)", icon: "⚠️", color: "#ef4444" },
+    FALLBACK_MCC_MNC: {
+      label: "Estimasi (Carrier)",
+      icon: "⚠️",
+      color: "#ef4444",
+    },
+    FALLBACK_COUNTRY: {
+      label: "Estimasi (Negara)",
+      icon: "⚠️",
+      color: "#ef4444",
+    },
   };
-  return sourceMap[source || ""] || { label: source || "Unknown", icon: "❓", color: "#6b7280" };
+  return (
+    sourceMap[source || ""] || {
+      label: source || "Unknown",
+      icon: "❓",
+      color: "#6b7280",
+    }
+  );
 }
 
 // Get accuracy message
 function getAccuracyMessage(locationSource?: string): string {
-  if (!locationSource) return "Data cell tower atau WiFi akan digunakan untuk estimasi lokasi";
-  
+  if (!locationSource)
+    return "Data cell tower atau WiFi akan digunakan untuk estimasi lokasi";
+
   switch (locationSource) {
     case "GPS":
       return "Lokasi dari GPS device (akurasi tinggi)";
@@ -76,7 +98,8 @@ export default function DeviceLocationMap({
 
   // Initialize map
   const initMap = useCallback(() => {
-    if (!mapRef.current || mapInstanceRef.current || initializedRef.current) return;
+    if (!mapRef.current || mapInstanceRef.current || initializedRef.current)
+      return;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const L = (window as any).L;
@@ -109,7 +132,7 @@ export default function DeviceLocationMap({
           <hr style="margin: 4px 0; border-color: #e5e7eb;"/>
           <span style="font-size: 11px;">
             📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
-            ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + ' km' : accuracy + ' m'}` : ''}
+            ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + " km" : accuracy + " m"}` : ""}
           </span>
         </div>
       `;
@@ -131,7 +154,9 @@ export default function DeviceLocationMap({
 
         // Fit bounds to show full circle if large
         if (accuracy > 100) {
-          mapInstanceRef.current.fitBounds(circleRef.current.getBounds(), { padding: [20, 20] });
+          mapInstanceRef.current.fitBounds(circleRef.current.getBounds(), {
+            padding: [20, 20],
+          });
         }
       }
     }
@@ -192,7 +217,7 @@ export default function DeviceLocationMap({
           <hr style="margin: 4px 0; border-color: #e5e7eb;"/>
           <span style="font-size: 11px;">
             📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
-            ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + ' km' : accuracy + ' m'}` : ''}
+            ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + " km" : accuracy + " m"}` : ""}
           </span>
         </div>
       `;
@@ -221,10 +246,12 @@ export default function DeviceLocationMap({
             weight: 2,
           }).addTo(mapInstanceRef.current);
         }
-        
+
         // Fit bounds to show full circle
         if (accuracy > 100) {
-          mapInstanceRef.current.fitBounds(circleRef.current.getBounds(), { padding: [20, 20] });
+          mapInstanceRef.current.fitBounds(circleRef.current.getBounds(), {
+            padding: [20, 20],
+          });
         }
       } else if (circleRef.current) {
         mapInstanceRef.current.removeLayer(circleRef.current);
@@ -269,7 +296,11 @@ export default function DeviceLocationMap({
           <span style={{ color: sourceInfo.color }}>{sourceInfo.label}</span>
           {accuracy && (
             <span className="text-gray-400 ml-1">
-              (~{accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + 'km' : accuracy + 'm'})
+              (~
+              {accuracy >= 1000
+                ? (accuracy / 1000).toFixed(1) + "km"
+                : accuracy + "m"}
+              )
             </span>
           )}
         </div>

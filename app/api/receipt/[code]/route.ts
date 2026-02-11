@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
-import { backendFetch } from "@/lib/backend-fetch";
+
+const BACKEND_URL = process.env.BACKEND_URL!;
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    // Await params di Next.js 15+
     const { code } = await params;
-    
-    const res = await backendFetch(`/transactions/${code}`);
+
+    // Panggil backend langsung TANPA auth (receipt publik)
+    const res = await fetch(`${BACKEND_URL}/transactions/${code}`, {
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+    });
 
     if (!res.ok) {
       return NextResponse.json(
@@ -22,7 +26,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: json.data, // unwrap backend response
+      data: json.data,
     });
   } catch (error) {
     return NextResponse.json(
