@@ -45,6 +45,11 @@ type Device = {
   mnc?: number;
   lac?: number;
   cellId?: number;
+  // Memory & Storage
+  totalMemory?: number;
+  availableMemory?: number;
+  totalStorage?: number;
+  availableStorage?: number;
 };
 
 const ONLINE_THRESHOLD = 5 * 60 * 1000; // 5 menit
@@ -242,6 +247,132 @@ export default function DeviceDetailDialog({
                 </p>
               </div>
             </div>
+
+            {/* Memory & Storage */}
+            {(device.totalMemory !== undefined ||
+              device.totalStorage !== undefined) && (
+              <div className="mt-2">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <Icon icon="mdi:memory" className="w-4 h-4" />
+                  Memory & Storage
+                </h4>
+                <div className="space-y-3">
+                  {/* RAM */}
+                  {device.totalMemory !== undefined && (
+                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Icon
+                            icon="mdi:memory"
+                            className="w-4 h-4 text-purple-500"
+                          />
+                          RAM
+                        </div>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {device.availableMemory ?? 0} MB /{" "}
+                          {device.totalMemory} MB
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            device.totalMemory > 0 &&
+                            (device.totalMemory -
+                              (device.availableMemory ?? 0)) /
+                              device.totalMemory >
+                              0.9
+                              ? "bg-red-500"
+                              : (device.totalMemory -
+                                    (device.availableMemory ?? 0)) /
+                                    device.totalMemory >
+                                  0.7
+                                ? "bg-yellow-500"
+                                : "bg-purple-500"
+                          }`}
+                          style={{
+                            width:
+                              device.totalMemory > 0
+                                ? `${Math.min(100, ((device.totalMemory - (device.availableMemory ?? 0)) / device.totalMemory) * 100)}%`
+                                : "0%",
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Terpakai:{" "}
+                        {device.totalMemory - (device.availableMemory ?? 0)} MB
+                        (
+                        {device.totalMemory > 0
+                          ? Math.round(
+                              ((device.totalMemory -
+                                (device.availableMemory ?? 0)) /
+                                device.totalMemory) *
+                                100,
+                            )
+                          : 0}
+                        %)
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Storage */}
+                  {device.totalStorage !== undefined && (
+                    <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <Icon
+                            icon="mdi:harddisk"
+                            className="w-4 h-4 text-blue-500"
+                          />
+                          Storage
+                        </div>
+                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                          {device.availableStorage ?? 0} MB /{" "}
+                          {device.totalStorage} MB
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            device.totalStorage > 0 &&
+                            (device.totalStorage -
+                              (device.availableStorage ?? 0)) /
+                              device.totalStorage >
+                              0.9
+                              ? "bg-red-500"
+                              : (device.totalStorage -
+                                    (device.availableStorage ?? 0)) /
+                                    device.totalStorage >
+                                  0.7
+                                ? "bg-yellow-500"
+                                : "bg-blue-500"
+                          }`}
+                          style={{
+                            width:
+                              device.totalStorage > 0
+                                ? `${Math.min(100, ((device.totalStorage - (device.availableStorage ?? 0)) / device.totalStorage) * 100)}%`
+                                : "0%",
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Terpakai:{" "}
+                        {device.totalStorage - (device.availableStorage ?? 0)}{" "}
+                        MB (
+                        {device.totalStorage > 0
+                          ? Math.round(
+                              ((device.totalStorage -
+                                (device.availableStorage ?? 0)) /
+                                device.totalStorage) *
+                                100,
+                            )
+                          : 0}
+                        %)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* ================= TAB: NETWORK ================= */}
