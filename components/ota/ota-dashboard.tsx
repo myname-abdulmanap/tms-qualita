@@ -123,22 +123,57 @@ function toLocalDatetimeInput(isoStr: string): string {
 
 function deviceStatusBadge(status: string) {
   const map: Record<string, { color: string; label: string }> = {
-    PENDING: { color: "bg-yellow-100 text-yellow-800 border-yellow-300", label: "Pending" },
-    DOWNLOADING: { color: "bg-blue-100 text-blue-800 border-blue-300", label: "Downloading" },
-    UPDATED: { color: "bg-green-100 text-green-800 border-green-300", label: "Updated" },
-    FAILED: { color: "bg-red-100 text-red-800 border-red-300", label: "Failed" },
+    PENDING: {
+      color: "bg-yellow-100 text-yellow-800 border-yellow-300",
+      label: "Pending",
+    },
+    DOWNLOADING: {
+      color: "bg-blue-100 text-blue-800 border-blue-300",
+      label: "Downloading",
+    },
+    UPDATED: {
+      color: "bg-green-100 text-green-800 border-green-300",
+      label: "Updated",
+    },
+    FAILED: {
+      color: "bg-red-100 text-red-800 border-red-300",
+      label: "Failed",
+    },
   };
-  const s = map[status] || { color: "bg-gray-100 text-gray-600", label: status };
-  return <Badge variant="outline" className={s.color}>{s.label}</Badge>;
+  const s = map[status] || {
+    color: "bg-gray-100 text-gray-600",
+    label: status,
+  };
+  return (
+    <Badge variant="outline" className={s.color}>
+      {s.label}
+    </Badge>
+  );
 }
 
 function strategyStatusBadge(status: string) {
   const map: Record<string, { color: string; icon: string; label: string }> = {
-    SCHEDULED: { color: "bg-blue-100 text-blue-800 border-blue-300", icon: "lucide:clock", label: "Scheduled" },
-    ACTIVE: { color: "bg-green-100 text-green-800 border-green-300", icon: "lucide:radio", label: "Active" },
-    EXPIRED: { color: "bg-gray-100 text-gray-500 border-gray-300", icon: "lucide:timer-off", label: "Expired" },
+    SCHEDULED: {
+      color: "bg-blue-100 text-blue-800 border-blue-300",
+      icon: "lucide:clock",
+      label: "Scheduled",
+    },
+    ACTIVE: {
+      color: "bg-green-100 text-green-800 border-green-300",
+      icon: "lucide:radio",
+      label: "Active",
+    },
+    EXPIRED: {
+      color: "bg-gray-100 text-gray-500 border-gray-300",
+      icon: "lucide:timer-off",
+      label: "Expired",
+    },
   };
-  const s = map[status] || { color: "bg-gray-100 text-gray-600", icon: "lucide:help-circle", label: status };
+  const s = map[status] || {
+    color: "bg-gray-100 text-gray-600",
+    icon: "lucide:help-circle",
+    label: status,
+  };
   return (
     <Badge variant="outline" className={`${s.color} flex items-center gap-1`}>
       <Icon icon={s.icon} className="h-3 w-3" />
@@ -176,7 +211,9 @@ export default function OtaDashboard() {
 
   // Strategy dialog
   const [strategyOpen, setStrategyOpen] = useState(false);
-  const [editingStrategy, setEditingStrategy] = useState<OtaStrategy | null>(null);
+  const [editingStrategy, setEditingStrategy] = useState<OtaStrategy | null>(
+    null,
+  );
   const [strategyName, setStrategyName] = useState("");
   const [strategyFirmwareId, setStrategyFirmwareId] = useState("");
   const [strategyStartAt, setStrategyStartAt] = useState("");
@@ -195,7 +232,9 @@ export default function OtaDashboard() {
 
   // Detail / Logs dialog
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailStrategy, setDetailStrategy] = useState<OtaStrategy | null>(null);
+  const [detailStrategy, setDetailStrategy] = useState<OtaStrategy | null>(
+    null,
+  );
   const [downloadLogs, setDownloadLogs] = useState<OtaDownloadLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
 
@@ -228,8 +267,8 @@ export default function OtaDashboard() {
   }, []);
 
   useEffect(() => {
-    Promise.all([fetchFirmwares(), fetchStrategies(), fetchDevices()]).finally(() =>
-      setLoading(false)
+    Promise.all([fetchFirmwares(), fetchStrategies(), fetchDevices()]).finally(
+      () => setLoading(false),
     );
   }, [fetchFirmwares, fetchStrategies, fetchDevices]);
 
@@ -249,7 +288,22 @@ export default function OtaDashboard() {
       form.append("version", uploadVersion);
       if (uploadDesc) form.append("description", uploadDesc);
 
-      const res = await fetch("/api/ota/firmware/upload", { method: "POST", body: form });
+      // Get auth token from session cookie
+      const tokenRes = await fetch("/api/auth/token");
+      const tokenData = await tokenRes.json();
+
+      const headers: HeadersInit = {};
+      if (tokenData.token) {
+        headers.Authorization = `Bearer ${tokenData.token}`;
+      }
+
+      // Upload directly to backend (bypass Vercel 4.5MB body limit)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+      const res = await fetch(`${backendUrl}/ota/firmware/upload`, {
+        method: "POST",
+        headers,
+        body: form,
+      });
       if (res.ok) {
         setUploadOpen(false);
         setUploadFile(null);
@@ -299,7 +353,13 @@ export default function OtaDashboard() {
   }
 
   async function handleSaveStrategy() {
-    if (!strategyName || !strategyFirmwareId || !strategyStartAt || !strategyEndAt) return;
+    if (
+      !strategyName ||
+      !strategyFirmwareId ||
+      !strategyStartAt ||
+      !strategyEndAt
+    )
+      return;
     setSavingStrategy(true);
     try {
       const body = {
@@ -378,7 +438,7 @@ export default function OtaDashboard() {
     try {
       await fetch(
         `/api/ota/strategies/${bindStrategyId}/devices/${deviceRecordId}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
       setBoundDevices((d) => d.filter((x) => x.id !== deviceRecordId));
       fetchStrategies();
@@ -389,7 +449,7 @@ export default function OtaDashboard() {
 
   function toggleSnSelection(sn: string) {
     setSelectedSns((prev) =>
-      prev.includes(sn) ? prev.filter((x) => x !== sn) : [...prev, sn]
+      prev.includes(sn) ? prev.filter((x) => x !== sn) : [...prev, sn],
     );
   }
 
@@ -413,18 +473,26 @@ export default function OtaDashboard() {
       !boundSns.includes(d.serialNumber) &&
       (deviceSearch === "" ||
         d.serialNumber.toLowerCase().includes(deviceSearch.toLowerCase()) ||
-        d.merchant?.name?.toLowerCase().includes(deviceSearch.toLowerCase()))
+        d.merchant?.name?.toLowerCase().includes(deviceSearch.toLowerCase())),
   );
 
   // Stats
-  const totalDownloads = strategies.reduce((a, s) => a + (s._count?.downloadLogs || 0), 0);
+  const totalDownloads = strategies.reduce(
+    (a, s) => a + (s._count?.downloadLogs || 0),
+    0,
+  );
   const activeCount = strategies.filter((s) => s.status === "ACTIVE").length;
-  const scheduledCount = strategies.filter((s) => s.status === "SCHEDULED").length;
+  const scheduledCount = strategies.filter(
+    (s) => s.status === "SCHEDULED",
+  ).length;
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Icon icon="lucide:loader-2" className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Icon
+          icon="lucide:loader-2"
+          className="h-8 w-8 animate-spin text-muted-foreground"
+        />
       </div>
     );
   }
@@ -437,7 +505,10 @@ export default function OtaDashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-blue-100 p-2">
-                <Icon icon="lucide:hard-drive" className="h-5 w-5 text-blue-600" />
+                <Icon
+                  icon="lucide:hard-drive"
+                  className="h-5 w-5 text-blue-600"
+                />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Firmware</p>
@@ -476,7 +547,10 @@ export default function OtaDashboard() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="rounded-lg bg-purple-100 p-2">
-                <Icon icon="lucide:download" className="h-5 w-5 text-purple-600" />
+                <Icon
+                  icon="lucide:download"
+                  className="h-5 w-5 text-purple-600"
+                />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Downloads</p>
@@ -513,19 +587,26 @@ export default function OtaDashboard() {
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <Icon icon="lucide:inbox" className="mx-auto mb-2 h-10 w-10" />
-                <p>No strategies yet. Create one to start deploying firmware.</p>
+                <p>
+                  No strategies yet. Create one to start deploying firmware.
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4">
               {strategies.map((s) => {
-                const devicesUpdated = s.devices?.filter((d) => d.status === "UPDATED").length || 0;
+                const devicesUpdated =
+                  s.devices?.filter((d) => d.status === "UPDATED").length || 0;
                 const devicesTotal = s._count?.devices || 0;
-                const devicesFailed = s.devices?.filter((d) => d.status === "FAILED").length || 0;
+                const devicesFailed =
+                  s.devices?.filter((d) => d.status === "FAILED").length || 0;
                 const totalDl = s._count?.downloadLogs || 0;
 
                 return (
-                  <Card key={s.id} className={`${s.status === "EXPIRED" ? "opacity-60" : ""}`}>
+                  <Card
+                    key={s.id}
+                    className={`${s.status === "EXPIRED" ? "opacity-60" : ""}`}
+                  >
                     <CardContent className="pt-6">
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         {/* Left: Info */}
@@ -534,7 +615,10 @@ export default function OtaDashboard() {
                             <h3 className="text-lg font-semibold">{s.name}</h3>
                             {strategyStatusBadge(s.status)}
                             {!s.isActive && (
-                              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                              <Badge
+                                variant="outline"
+                                className="bg-orange-100 text-orange-700 border-orange-300"
+                              >
                                 Disabled
                               </Badge>
                             )}
@@ -542,32 +626,56 @@ export default function OtaDashboard() {
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                             <div>
-                              <span className="text-muted-foreground">Firmware:</span>{" "}
-                              <span className="font-medium">v{s.firmware.version}</span>
+                              <span className="text-muted-foreground">
+                                Firmware:
+                              </span>{" "}
+                              <span className="font-medium">
+                                v{s.firmware.version}
+                              </span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Start:</span>{" "}
-                              <span className="font-medium">{formatDate(s.startAt)}</span>
+                              <span className="text-muted-foreground">
+                                Start:
+                              </span>{" "}
+                              <span className="font-medium">
+                                {formatDate(s.startAt)}
+                              </span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">End:</span>{" "}
-                              <span className="font-medium">{formatDate(s.endAt)}</span>
+                              <span className="text-muted-foreground">
+                                End:
+                              </span>{" "}
+                              <span className="font-medium">
+                                {formatDate(s.endAt)}
+                              </span>
                             </div>
                             <div>
                               {s.status === "ACTIVE" ? (
                                 <>
-                                  <span className="text-muted-foreground">Expires in:</span>{" "}
-                                  <span className="font-medium text-orange-600">{timeRemaining(s.endAt)}</span>
+                                  <span className="text-muted-foreground">
+                                    Expires in:
+                                  </span>{" "}
+                                  <span className="font-medium text-orange-600">
+                                    {timeRemaining(s.endAt)}
+                                  </span>
                                 </>
                               ) : s.status === "SCHEDULED" ? (
                                 <>
-                                  <span className="text-muted-foreground">Starts in:</span>{" "}
-                                  <span className="font-medium text-blue-600">{timeRemaining(s.startAt)}</span>
+                                  <span className="text-muted-foreground">
+                                    Starts in:
+                                  </span>{" "}
+                                  <span className="font-medium text-blue-600">
+                                    {timeRemaining(s.startAt)}
+                                  </span>
                                 </>
                               ) : (
                                 <>
-                                  <span className="text-muted-foreground">Ended:</span>{" "}
-                                  <span className="font-medium text-gray-500">{formatDate(s.endAt)}</span>
+                                  <span className="text-muted-foreground">
+                                    Ended:
+                                  </span>{" "}
+                                  <span className="font-medium text-gray-500">
+                                    {formatDate(s.endAt)}
+                                  </span>
                                 </>
                               )}
                             </div>
@@ -575,13 +683,18 @@ export default function OtaDashboard() {
 
                           {/* Device progress bar */}
                           <div className="flex items-center gap-3 text-sm">
-                            <span className="text-muted-foreground">Devices:</span>
+                            <span className="text-muted-foreground">
+                              Devices:
+                            </span>
                             <div className="flex items-center gap-2 flex-1 max-w-xs">
                               <div className="h-2 flex-1 rounded-full bg-gray-100 overflow-hidden">
                                 <div
                                   className="h-full bg-green-500 rounded-full transition-all"
                                   style={{
-                                    width: devicesTotal > 0 ? `${(devicesUpdated / devicesTotal) * 100}%` : "0%",
+                                    width:
+                                      devicesTotal > 0
+                                        ? `${(devicesUpdated / devicesTotal) * 100}%`
+                                        : "0%",
                                   }}
                                 />
                               </div>
@@ -590,7 +703,9 @@ export default function OtaDashboard() {
                               </span>
                             </div>
                             {devicesFailed > 0 && (
-                              <span className="text-xs text-red-500">{devicesFailed} failed</span>
+                              <span className="text-xs text-red-500">
+                                {devicesFailed} failed
+                              </span>
                             )}
                             <span className="text-xs text-muted-foreground">
                               | {totalDl} downloads
@@ -606,7 +721,10 @@ export default function OtaDashboard() {
                             title="Detail & Logs"
                             onClick={() => openDetail(s)}
                           >
-                            <Icon icon="lucide:bar-chart-3" className="h-4 w-4" />
+                            <Icon
+                              icon="lucide:bar-chart-3"
+                              className="h-4 w-4"
+                            />
                           </Button>
                           <Button
                             variant="ghost"
@@ -614,7 +732,10 @@ export default function OtaDashboard() {
                             title="Manage Devices"
                             onClick={() => openBindDialog(s.id, s.name)}
                           >
-                            <Icon icon="lucide:monitor-smartphone" className="h-4 w-4" />
+                            <Icon
+                              icon="lucide:monitor-smartphone"
+                              className="h-4 w-4"
+                            />
                           </Button>
                           <Button
                             variant="ghost"
@@ -627,20 +748,32 @@ export default function OtaDashboard() {
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" title="Delete">
-                                <Icon icon="lucide:trash-2" className="h-4 w-4 text-red-500" />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="Delete"
+                              >
+                                <Icon
+                                  icon="lucide:trash-2"
+                                  className="h-4 w-4 text-red-500"
+                                />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Strategy?</AlertDialogTitle>
+                                <AlertDialogTitle>
+                                  Delete Strategy?
+                                </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Strategy &quot;{s.name}&quot; and all device bindings will be deleted.
+                                  Strategy &quot;{s.name}&quot; and all device
+                                  bindings will be deleted.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteStrategy(s.id)}>
+                                <AlertDialogAction
+                                  onClick={() => handleDeleteStrategy(s.id)}
+                                >
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -681,23 +814,34 @@ export default function OtaDashboard() {
               <TableBody>
                 {firmwares.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground py-8"
+                    >
                       No firmware uploaded yet
                     </TableCell>
                   </TableRow>
                 ) : (
                   firmwares.map((fw) => (
                     <TableRow key={fw.id}>
-                      <TableCell className="font-mono font-semibold">v{fw.version}</TableCell>
+                      <TableCell className="font-mono font-semibold">
+                        v{fw.version}
+                      </TableCell>
                       <TableCell className="text-sm">{fw.filename}</TableCell>
-                      <TableCell className="text-sm">{formatFileSize(fw.filesize)}</TableCell>
+                      <TableCell className="text-sm">
+                        {formatFileSize(fw.filesize)}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                         {fw.description || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{fw._count.strategies}</Badge>
+                        <Badge variant="secondary">
+                          {fw._count.strategies}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-sm">{formatDate(fw.createdAt)}</TableCell>
+                      <TableCell className="text-sm">
+                        {formatDate(fw.createdAt)}
+                      </TableCell>
                       <TableCell>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -711,19 +855,27 @@ export default function OtaDashboard() {
                                   : "Delete"
                               }
                             >
-                              <Icon icon="lucide:trash-2" className="h-4 w-4 text-red-500" />
+                              <Icon
+                                icon="lucide:trash-2"
+                                className="h-4 w-4 text-red-500"
+                              />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Firmware?</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                Delete Firmware?
+                              </AlertDialogTitle>
                               <AlertDialogDescription>
-                                v{fw.version} ({fw.filename}) will be permanently deleted.
+                                v{fw.version} ({fw.filename}) will be
+                                permanently deleted.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteFirmware(fw.id)}>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteFirmware(fw.id)}
+                              >
                                 Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
@@ -779,10 +931,16 @@ export default function OtaDashboard() {
             <Button variant="outline" onClick={() => setUploadOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpload} disabled={uploading || !uploadFile || !uploadVersion}>
+            <Button
+              onClick={handleUpload}
+              disabled={uploading || !uploadFile || !uploadVersion}
+            >
               {uploading ? (
                 <>
-                  <Icon icon="lucide:loader-2" className="mr-1 h-4 w-4 animate-spin" />
+                  <Icon
+                    icon="lucide:loader-2"
+                    className="mr-1 h-4 w-4 animate-spin"
+                  />
                   Uploading...
                 </>
               ) : (
@@ -797,7 +955,9 @@ export default function OtaDashboard() {
       <Dialog open={strategyOpen} onOpenChange={setStrategyOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingStrategy ? "Edit Strategy" : "New Strategy"}</DialogTitle>
+            <DialogTitle>
+              {editingStrategy ? "Edit Strategy" : "New Strategy"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
@@ -810,7 +970,10 @@ export default function OtaDashboard() {
             </div>
             <div className="space-y-1">
               <Label>Firmware *</Label>
-              <Select value={strategyFirmwareId} onValueChange={setStrategyFirmwareId}>
+              <Select
+                value={strategyFirmwareId}
+                onValueChange={setStrategyFirmwareId}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select firmware" />
                 </SelectTrigger>
@@ -842,7 +1005,10 @@ export default function OtaDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Switch checked={strategyActive} onCheckedChange={setStrategyActive} />
+              <Switch
+                checked={strategyActive}
+                onCheckedChange={setStrategyActive}
+              />
               <Label>Active</Label>
             </div>
           </div>
@@ -861,7 +1027,10 @@ export default function OtaDashboard() {
               }
             >
               {savingStrategy ? (
-                <Icon icon="lucide:loader-2" className="mr-1 h-4 w-4 animate-spin" />
+                <Icon
+                  icon="lucide:loader-2"
+                  className="mr-1 h-4 w-4 animate-spin"
+                />
               ) : null}
               {editingStrategy ? "Save Changes" : "Create"}
             </Button>
@@ -874,7 +1043,10 @@ export default function OtaDashboard() {
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              <Icon icon="lucide:monitor-smartphone" className="inline mr-2 h-5 w-5" />
+              <Icon
+                icon="lucide:monitor-smartphone"
+                className="inline mr-2 h-5 w-5"
+              />
               Manage Devices — {bindStrategyName}
             </DialogTitle>
           </DialogHeader>
@@ -885,7 +1057,9 @@ export default function OtaDashboard() {
               Bound Devices ({boundDevices.length})
             </h4>
             {boundDevices.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No devices bound yet</p>
+              <p className="text-sm text-muted-foreground">
+                No devices bound yet
+              </p>
             ) : (
               <div className="max-h-[200px] overflow-y-auto border rounded">
                 <Table>
@@ -901,9 +1075,13 @@ export default function OtaDashboard() {
                   <TableBody>
                     {boundDevices.map((d) => (
                       <TableRow key={d.id}>
-                        <TableCell className="font-mono text-sm">{d.deviceSn}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {d.deviceSn}
+                        </TableCell>
                         <TableCell>{deviceStatusBadge(d.status)}</TableCell>
-                        <TableCell className="text-sm">{d.downloadCount}</TableCell>
+                        <TableCell className="text-sm">
+                          {d.downloadCount}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {d.lastCheckedAt ? formatDate(d.lastCheckedAt) : "—"}
                         </TableCell>
@@ -913,7 +1091,10 @@ export default function OtaDashboard() {
                             size="icon"
                             onClick={() => handleUnbindDevice(d.id)}
                           >
-                            <Icon icon="lucide:x" className="h-4 w-4 text-red-500" />
+                            <Icon
+                              icon="lucide:x"
+                              className="h-4 w-4 text-red-500"
+                            />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -946,7 +1127,10 @@ export default function OtaDashboard() {
                 <TableBody>
                   {availableDevices.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground text-sm">
+                      <TableCell
+                        colSpan={5}
+                        className="text-center text-muted-foreground text-sm"
+                      >
                         No available devices
                       </TableCell>
                     </TableRow>
@@ -965,10 +1149,16 @@ export default function OtaDashboard() {
                             className="rounded"
                           />
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{d.serialNumber}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {d.serialNumber}
+                        </TableCell>
                         <TableCell className="text-sm">{d.model}</TableCell>
-                        <TableCell className="text-sm">{d.merchant?.name || "—"}</TableCell>
-                        <TableCell className="text-sm">{d.firmware || "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {d.merchant?.name || "—"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {d.firmware || "—"}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -976,9 +1166,16 @@ export default function OtaDashboard() {
               </Table>
             </div>
             {selectedSns.length > 0 && (
-              <Button onClick={handleBindDevices} disabled={bindLoading} size="sm">
+              <Button
+                onClick={handleBindDevices}
+                disabled={bindLoading}
+                size="sm"
+              >
                 {bindLoading ? (
-                  <Icon icon="lucide:loader-2" className="mr-1 h-4 w-4 animate-spin" />
+                  <Icon
+                    icon="lucide:loader-2"
+                    className="mr-1 h-4 w-4 animate-spin"
+                  />
                 ) : null}
                 Bind {selectedSns.length} Device(s)
               </Button>
@@ -1004,16 +1201,22 @@ export default function OtaDashboard() {
                 {/* Summary cards */}
                 <div className="grid grid-cols-3 gap-3">
                   <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold">{detailStrategy._count?.devices || 0}</p>
+                    <p className="text-2xl font-bold">
+                      {detailStrategy._count?.devices || 0}
+                    </p>
                     <p className="text-xs text-muted-foreground">Devices</p>
                   </div>
                   <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold">{detailStrategy._count?.downloadLogs || 0}</p>
+                    <p className="text-2xl font-bold">
+                      {detailStrategy._count?.downloadLogs || 0}
+                    </p>
                     <p className="text-xs text-muted-foreground">Downloads</p>
                   </div>
                   <div className="border rounded-lg p-3 text-center">
                     <p className="text-2xl font-bold">
-                      {detailStrategy.devices?.filter((d) => d.status === "UPDATED").length || 0}
+                      {detailStrategy.devices?.filter(
+                        (d) => d.status === "UPDATED",
+                      ).length || 0}
                     </p>
                     <p className="text-xs text-muted-foreground">Updated</p>
                   </div>
@@ -1023,60 +1226,82 @@ export default function OtaDashboard() {
                 <div className="border rounded-lg p-3 space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Firmware:</span>
-                    <span className="font-mono">v{detailStrategy.firmware.version} ({formatFileSize(detailStrategy.firmware.filesize)})</span>
+                    <span className="font-mono">
+                      v{detailStrategy.firmware.version} (
+                      {formatFileSize(detailStrategy.firmware.filesize)})
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Window:</span>
-                    <span>{formatDate(detailStrategy.startAt)} — {formatDate(detailStrategy.endAt)}</span>
+                    <span>
+                      {formatDate(detailStrategy.startAt)} —{" "}
+                      {formatDate(detailStrategy.endAt)}
+                    </span>
                   </div>
                   {detailStrategy.status === "ACTIVE" && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Expires in:</span>
-                      <span className="text-orange-600 font-medium">{timeRemaining(detailStrategy.endAt)}</span>
+                      <span className="text-orange-600 font-medium">
+                        {timeRemaining(detailStrategy.endAt)}
+                      </span>
                     </div>
                   )}
                 </div>
 
                 {/* Device statuses */}
-                {detailStrategy.devices && detailStrategy.devices.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Device Status</h4>
-                    <div className="max-h-[200px] overflow-y-auto border rounded">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>SN</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Downloads</TableHead>
-                            <TableHead>Last Check</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {detailStrategy.devices.map((d) => (
-                            <TableRow key={d.id}>
-                              <TableCell className="font-mono text-sm">{d.deviceSn}</TableCell>
-                              <TableCell>{deviceStatusBadge(d.status)}</TableCell>
-                              <TableCell className="text-sm">{d.downloadCount}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {d.lastCheckedAt ? formatDate(d.lastCheckedAt) : "—"}
-                              </TableCell>
+                {detailStrategy.devices &&
+                  detailStrategy.devices.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Device Status</h4>
+                      <div className="max-h-[200px] overflow-y-auto border rounded">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>SN</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Downloads</TableHead>
+                              <TableHead>Last Check</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {detailStrategy.devices.map((d) => (
+                              <TableRow key={d.id}>
+                                <TableCell className="font-mono text-sm">
+                                  {d.deviceSn}
+                                </TableCell>
+                                <TableCell>
+                                  {deviceStatusBadge(d.status)}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {d.downloadCount}
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {d.lastCheckedAt
+                                    ? formatDate(d.lastCheckedAt)
+                                    : "—"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Download logs */}
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium">Recent Download Logs</h4>
                   {logsLoading ? (
                     <div className="flex justify-center py-4">
-                      <Icon icon="lucide:loader-2" className="h-5 w-5 animate-spin text-muted-foreground" />
+                      <Icon
+                        icon="lucide:loader-2"
+                        className="h-5 w-5 animate-spin text-muted-foreground"
+                      />
                     </div>
                   ) : downloadLogs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No downloads yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      No downloads yet
+                    </p>
                   ) : (
                     <div className="max-h-[200px] overflow-y-auto border rounded">
                       <Table>
@@ -1089,8 +1314,12 @@ export default function OtaDashboard() {
                         <TableBody>
                           {downloadLogs.map((log) => (
                             <TableRow key={log.id}>
-                              <TableCell className="font-mono text-sm">{log.deviceSn}</TableCell>
-                              <TableCell className="text-sm">{formatDate(log.createdAt)}</TableCell>
+                              <TableCell className="font-mono text-sm">
+                                {log.deviceSn}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {formatDate(log.createdAt)}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1106,4 +1335,3 @@ export default function OtaDashboard() {
     </div>
   );
 }
-

@@ -409,7 +409,7 @@ export default function SettlementDashboard() {
                     <TableHead>Metode</TableHead>
                     <TableHead className="text-right">Jumlah</TableHead>
                     <TableHead>Waktu</TableHead>
-                    <TableHead>Usia</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

@@ -46,6 +46,11 @@ const MENU: MenuItem[] = [
         icon: "lucide:layout-dashboard",
         label: "Device Management",
       },
+      {
+        href: "/ota",
+        icon: "lucide:cloud-download",
+        label: "OTA Update",
+      },
     ],
   },
   {
@@ -65,11 +70,6 @@ const MENU: MenuItem[] = [
     href: "/settlements",
     icon: "lucide:landmark",
     label: "Settlement & Saldo",
-  },
-  {
-    href: "/ota",
-    icon: "lucide:cloud-download",
-    label: "OTA Update",
   },
   { href: "/merchants", icon: "lucide:shopping-cart", label: "Merchants" },
   { href: "/users", icon: "lucide:users", label: "Users" },
