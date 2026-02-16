@@ -21,7 +21,7 @@ export default function LoginPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col h-full w-full p-10 xl:p-14">
           {/* Logo */}
-          <div className="flex items-center gap-3 animate-[fadeInDown_0.6s_ease-out]">
+          <div className="flex items-center gap-3 mt-4 animate-[fadeInDown_0.6s_ease-out]">
             <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
               <Icon icon="wpf:android" className="w-6 h-6 text-white" />
             </div>
@@ -151,14 +151,13 @@ function LoginClient() {
 
   return (
     <div className="w-full max-w-sm">
-      {/* Mobile Logo */}
-      <div className="lg:hidden flex items-center gap-3 mb-10 animate-[fadeInDown_0.5s_ease-out]">
-        <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
-          <Icon icon="wpf:android" className="w-6 h-6 text-white" />
-        </div>
-        <span className="text-slate-900 dark:text-white font-semibold text-lg tracking-tight">
-          Qualita TMS
-        </span>
+      {/* Logo */}
+      <div className="mb-6 animate-[fadeInDown_0.5s_ease-out]">
+        <img
+          src="https://qualita-indonesia.com/assets/img/qualita_indonesia_logo.png"
+          alt="Qualita Indonesia"
+          className="h-24 w-auto"
+        />
       </div>
 
       {/* Header */}
@@ -259,7 +258,7 @@ function LoginClient() {
 
       {/* Footer */}
       <p className="text-center text-xs text-slate-400 mt-8 animate-[fadeIn_0.7s_ease-out_0.3s_both]">
-        © 2026 Qualita TMS
+        © 2026 Qualita Indonesia
       </p>
     </div>
   );
