@@ -11,11 +11,15 @@ export async function POST(req: Request) {
     body: JSON.stringify({ email, password: pwd }),
   });
 
-  const data = await res.json(); // { token }
+  const rawText = await res.text();
 
-  if (!res.ok) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!res.ok || !contentType.includes("application/json")) {
+    console.error(`[login] backend responded ${res.status}, body: ${rawText.slice(0, 200)}`);
     return NextResponse.json({ message: "Login failed" }, { status: 401 });
   }
+
+  const data = JSON.parse(rawText); // { token }
 
   const response = NextResponse.json({ ok: true });
 

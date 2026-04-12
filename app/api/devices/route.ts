@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { backendFetch } from "@/lib/backend-fetch";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     console.log("🎯 Frontend /api/devices GET called");
-    const res = await backendFetch("/devices");
+    const { searchParams } = new URL(req.url);
+    const query = searchParams.toString();
+    const res = await backendFetch(query ? `/devices?${query}` : "/devices");
     console.log("📡 GET /devices backend response status:", res.status);
     
     if (!res.ok) {

@@ -38,18 +38,40 @@ const MENU: MenuItem[] = [
   { href: "/dashboard", icon: "lucide:bar-chart-3", label: "Dashboard" },
   {
     icon: "lucide:box",
-    label: "Devices",
+    label: "Soundbox",
     href: "/devices",
     children: [
       {
         href: "/devices",
         icon: "lucide:layout-dashboard",
-        label: "Device Management",
+        label: "Soundbox Management",
       },
       {
         href: "/ota",
         icon: "lucide:cloud-download",
-        label: "OTA Update",
+        label: "Soundbox OTA",
+      },
+    ],
+  },
+  {
+    icon: "lucide:smartphone",
+    label: "EDC",
+    href: "/edc/devices",
+    children: [
+      {
+        href: "/edc/devices",
+        icon: "lucide:layout-dashboard",
+        label: "Devices & Health",
+      },
+      {
+        href: "/edc/ota",
+        icon: "lucide:cloud-download",
+        label: "OTA & App Update",
+      },
+      {
+        href: "/edc/mqtt",
+        icon: "lucide:radio",
+        label: "MQTT Config",
       },
     ],
   },

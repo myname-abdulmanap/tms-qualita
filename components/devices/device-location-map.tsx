@@ -14,6 +14,7 @@ type DeviceLocationMapProps = {
   longitude?: number;
   accuracy?: number; // meters
   locationSource?: string;
+  locationName?: string;
   deviceName?: string;
   className?: string;
 };
@@ -84,6 +85,7 @@ export default function DeviceLocationMap({
   longitude,
   accuracy,
   locationSource,
+  locationName,
   deviceName = "Device",
   className = "",
 }: DeviceLocationMapProps) {
@@ -112,19 +114,21 @@ export default function DeviceLocationMap({
     const defaultLng = longitude || 106.8456;
     const hasLoc = latitude && longitude;
 
-    mapInstanceRef.current = L.map(mapRef.current).setView(
-      [defaultLat, defaultLng],
-      hasLoc ? 15 : 5,
-    );
+    mapInstanceRef.current = L.map(mapRef.current, {
+      attributionControl: false,
+    }).setView([defaultLat, defaultLng], hasLoc ? 15 : 5);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      attribution: "",
     }).addTo(mapInstanceRef.current);
+
+    L.control
+      .attribution({ prefix: "TMS Qualita" })
+      .addTo(mapInstanceRef.current);
 
     if (hasLoc && latitude && longitude) {
       const popupContent = `
-        <div style="min-width: 150px;">
+        <div style="min-width: 180px; max-width: 260px;">
           <b>${deviceName}</b><br/>
           <small style="color: ${sourceInfo.color};">
             ${sourceInfo.icon} ${sourceInfo.label}
@@ -133,11 +137,24 @@ export default function DeviceLocationMap({
           <span style="font-size: 11px;">
             📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
             ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + " km" : accuracy + " m"}` : ""}
+            ${locationName ? `<br/>🏷️ ${locationName}` : ""}
           </span>
         </div>
       `;
 
-      markerRef.current = L.marker([defaultLat, defaultLng])
+      const phoneIcon = L.divIcon({
+        html: `<div style="width:32px;height:32px;background:#0ea5e9;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z"/></svg>
+        </div>`,
+        className: "",
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -18],
+      });
+
+      markerRef.current = L.marker([defaultLat, defaultLng], {
+        icon: phoneIcon,
+      })
         .addTo(mapInstanceRef.current)
         .bindPopup(popupContent)
         .openPopup();
@@ -160,7 +177,7 @@ export default function DeviceLocationMap({
         }
       }
     }
-  }, [latitude, longitude, accuracy, deviceName, sourceInfo]);
+  }, [latitude, longitude, accuracy, locationName, deviceName, sourceInfo]);
 
   // Load Leaflet and initialize map
   useEffect(() => {
@@ -209,7 +226,7 @@ export default function DeviceLocationMap({
 
       // Update or create marker
       const popupContent = `
-        <div style="min-width: 150px;">
+        <div style="min-width: 180px; max-width: 260px;">
           <b>${deviceName}</b><br/>
           <small style="color: ${sourceInfo.color};">
             ${sourceInfo.icon} ${sourceInfo.label}
@@ -218,6 +235,7 @@ export default function DeviceLocationMap({
           <span style="font-size: 11px;">
             📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
             ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + " km" : accuracy + " m"}` : ""}
+            ${locationName ? `<br/>🏷️ ${locationName}` : ""}
           </span>
         </div>
       `;
@@ -226,7 +244,17 @@ export default function DeviceLocationMap({
         markerRef.current.setLatLng(latlng);
         markerRef.current.bindPopup(popupContent);
       } else {
-        markerRef.current = L.marker(latlng)
+        const phoneIconUpd = L.divIcon({
+          html: `<div style="width:32px;height:32px;background:#0ea5e9;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17,19H7V5H17M17,1H7C5.89,1 5,1.89 5,3V21A2,2 0 0,0 7,23H17A2,2 0 0,0 19,21V3C19,1.89 18.1,1 17,1Z"/></svg>
+          </div>`,
+          className: "",
+          iconSize: [32, 32],
+          iconAnchor: [16, 16],
+          popupAnchor: [0, -18],
+        });
+
+        markerRef.current = L.marker(latlng, { icon: phoneIconUpd })
           .addTo(mapInstanceRef.current)
           .bindPopup(popupContent)
           .openPopup();
@@ -258,7 +286,7 @@ export default function DeviceLocationMap({
         circleRef.current = null;
       }
     }
-  }, [latitude, longitude, accuracy, deviceName, sourceInfo]);
+  }, [latitude, longitude, accuracy, locationName, deviceName, sourceInfo]);
 
   return (
     <div className={`relative ${className}`}>

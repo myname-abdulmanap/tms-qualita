@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import DeviceDialog from "./device-dialog";
 import DeviceDetailDialog from "./device-detail-dialog";
 
@@ -13,6 +14,7 @@ type Device = {
   serialNumber: string;
   model: string;
   status: string;
+  deviceType?: "EDC" | "SOUNDBOX";
   merchantId: string;
   merchant?: {
     id: string;
@@ -20,6 +22,12 @@ type Device = {
     clientId?: string;
   };
   createdAt?: string;
+  locationName?: string | null;
+  rawInfo?: Record<string, string> | null;
+  healthInsights?: unknown[] | null;
+  componentDiagnostics?: unknown[] | null;
+  installedApps?: unknown[] | null;
+  componentScore?: number | null;
 };
 
 type CurrentUser = {
@@ -29,7 +37,29 @@ type CurrentUser = {
   permissions: string[];
 };
 
-export default function DeviceTable() {
+function getDeviceTypeBadge(deviceType?: "EDC" | "SOUNDBOX") {
+  if (deviceType === "EDC") {
+    return (
+      <span className="inline-flex items-center rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+        EDC
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+      SOUNDBOX
+    </span>
+  );
+}
+
+export default function DeviceTable({
+  mode = "edc",
+  basePath = "/devices",
+}: {
+  mode?: "edc" | "soundbox";
+  basePath?: string;
+}) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [open, setOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<Device | null>(null);
@@ -37,11 +67,13 @@ export default function DeviceTable() {
   const [loading, setLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailDevice, setDetailDevice] = useState<Device | null>(null);
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     loadCurrentUser();
     loadDevices();
-  }, []);
+  }, [mode]);
 
   const loadCurrentUser = async () => {
     try {
@@ -58,7 +90,8 @@ export default function DeviceTable() {
   const loadDevices = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/devices");
+      const deviceTypeParam = mode === "soundbox" ? "SOUNDBOX" : "EDC";
+      const res = await fetch(`/api/devices?deviceType=${deviceTypeParam}`);
       if (!res.ok) throw new Error("Failed to load devices");
       const data = await res.json();
       console.log("📦 Loaded devices with merchant data:", data);
@@ -107,6 +140,27 @@ export default function DeviceTable() {
     setOpen(true);
   };
 
+  const openDetail = async (device: Device) => {
+    // EDC: navigate to full detail page
+    if (mode === "edc") {
+      router.push(`/edc/devices/${device.id}`);
+      return;
+    }
+    setDetailLoadingId(device.id);
+    try {
+      const res = await fetch(`/api/devices/${device.id}`);
+      if (!res.ok) throw new Error("Failed to load device detail");
+      const data = await res.json();
+      setDetailDevice(data);
+      setDetailOpen(true);
+    } catch (error) {
+      console.error("Error loading device detail:", error);
+      alert("Gagal memuat detail device");
+    } finally {
+      setDetailLoadingId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "ACTIVE":
@@ -141,11 +195,12 @@ export default function DeviceTable() {
       <div className="mb-4 flex justify-between items-center">
         <div>
           <p className="text-sm text-gray-500">
-            {devices.length} device{devices.length !== 1 ? "s" : ""} total
+            {devices.length} {mode === "soundbox" ? "soundbox" : "device"}
+            {devices.length !== 1 ? "s" : ""} total
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/devices/map">
+          <Link href={`${basePath}/map`}>
             <Button variant="outline">
               <Icon icon="mdi:map-marker-multiple" className="mr-1 w-4 h-4" />{" "}
               Map View
@@ -153,7 +208,8 @@ export default function DeviceTable() {
           </Link>
           {!currentUser?.merchantId && (
             <Button onClick={handleAdd}>
-              <Icon icon="mdi:plus" className="mr-1" /> Add Device
+              <Icon icon="mdi:plus" className="mr-1" />
+              {mode === "soundbox" ? "Add Soundbox" : "Add Device"}
             </Button>
           )}
         </div>
@@ -195,7 +251,8 @@ export default function DeviceTable() {
                     colSpan={6}
                     className="p-8 text-center text-gray-500 dark:text-gray-400"
                   >
-                    Belum ada device. Buat device pertama Anda.
+                    Belum ada {mode === "soundbox" ? "soundbox" : "device"}.
+                    Buat data pertama Anda.
                   </td>
                 </tr>
               ) : (
@@ -205,7 +262,10 @@ export default function DeviceTable() {
                     className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <td className="p-3 font-medium text-gray-900 dark:text-gray-100">
-                      {device.deviceCode}
+                      <div className="flex flex-col gap-1">
+                        <span>{device.deviceCode}</span>
+                        {getDeviceTypeBadge(device.deviceType)}
+                      </div>
                     </td>
                     <td className="p-3 text-gray-900 dark:text-gray-100">
                       {device.serialNumber}
@@ -225,10 +285,8 @@ export default function DeviceTable() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              setDetailDevice(device);
-                              setDetailOpen(true);
-                            }}
+                            onClick={() => openDetail(device)}
+                            disabled={detailLoadingId === device.id}
                           >
                             <Icon icon="mdi:eye" className="w-4 h-4" />
                           </Button>
@@ -272,6 +330,7 @@ export default function DeviceTable() {
       <DeviceDialog
         open={open}
         device={editDevice}
+        mode={mode}
         onClose={() => {
           setOpen(false);
           setEditDevice(null);

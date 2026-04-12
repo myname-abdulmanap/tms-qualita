@@ -24,8 +24,8 @@ type Device = {
   id?: string;
   deviceCode: string;
   serialNumber: string;
+  deviceType?: "EDC" | "SOUNDBOX";
   model?: string;
-  firmware?: string;
   batteryLevel?: number;
   charging?: boolean;
   signal?: number;
@@ -50,6 +50,32 @@ type Device = {
   availableMemory?: number;
   totalStorage?: number;
   availableStorage?: number;
+  // EDC/Android specific
+  androidVersion?: string;
+  appVersion?: string;
+  lastHealthScore?: number;
+  telemetryUpdatedAt?: string | null;
+  locationName?: string | null;
+  rawInfo?: Record<string, string> | null;
+  healthInsights?: Array<{
+    title?: string;
+    status?: string;
+    detail?: string;
+    isWarning?: boolean;
+  }> | null;
+  componentDiagnostics?: Array<{
+    title?: string;
+    status?: string;
+    detail?: string;
+    isWarning?: boolean;
+  }> | null;
+  installedApps?: Array<{
+    name?: string;
+    packageName?: string;
+    versionName?: string;
+    isSystemApp?: boolean;
+  }> | null;
+  componentScore?: number | null;
 };
 
 const ONLINE_THRESHOLD = 5 * 60 * 1000; // 5 menit
@@ -110,6 +136,14 @@ function getLocationSourceLabel(source?: string) {
   return labels[source] || source;
 }
 
+function getDeviceTypeBadge(deviceType?: "EDC" | "SOUNDBOX") {
+  if (deviceType === "EDC") {
+    return "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300";
+  }
+
+  return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+}
+
 export default function DeviceDetailDialog({
   open,
   device,
@@ -123,30 +157,9 @@ export default function DeviceDetailDialog({
 
   const online = isOnline(device.lastSeenAt);
 
-  // Check connection mode
   const isWifiMode = device.commode?.toUpperCase() === "WIFI";
-
-  // Valid location sources for each mode
-  const wifiValidSources = ["WIFI", "MOZILLA_MLS", "GOOGLE"];
-  const cellValidSources = [
-    "CELL_TOWER",
-    "OPENCELLID",
-    "UNWIREDLABS",
-    "GOOGLE",
-    "FALLBACK_MCC_MNC",
-    "FALLBACK_COUNTRY",
-  ];
-
-  // Check if location source matches current connection mode
-  const isLocationSourceValid = device.locationSource
-    ? isWifiMode
-      ? wifiValidSources.includes(device.locationSource)
-      : cellValidSources.includes(device.locationSource)
-    : false;
-
-  // Only show location if lat/lng exists AND source matches current mode
   const hasValidLocation =
-    device.latitude && device.longitude && isLocationSourceValid;
+    typeof device.latitude === "number" && typeof device.longitude === "number";
 
   // Check if any cell tower data exists (not null/undefined, and has meaningful values)
   const hasCellTower =
@@ -155,6 +168,16 @@ export default function DeviceDetailDialog({
     device.mcc !== undefined &&
     device.mcc > 0;
 
+  const healthInsights = Array.isArray(device.healthInsights)
+    ? device.healthInsights
+    : [];
+  const componentDiagnostics = Array.isArray(device.componentDiagnostics)
+    ? device.componentDiagnostics
+    : [];
+  const installedApps = Array.isArray(device.installedApps)
+    ? device.installedApps
+    : [];
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -162,15 +185,28 @@ export default function DeviceDetailDialog({
           <DialogTitle className="flex items-center gap-2">
             <Icon icon="mdi:devices" className="w-5 h-5" />
             Device Detail - {device.deviceCode}
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${getDeviceTypeBadge(device.deviceType)}`}
+            >
+              {device.deviceType || "SOUNDBOX"}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="info" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList
+            className={`grid w-full ${device.deviceType === "EDC" ? "grid-cols-5" : "grid-cols-3"}`}
+          >
             <TabsTrigger value="info">
               <Icon icon="mdi:information" className="w-4 h-4 mr-1" />
               Info
             </TabsTrigger>
+            {device.deviceType === "EDC" && (
+              <TabsTrigger value="health">
+                <Icon icon="mdi:heart-pulse" className="w-4 h-4 mr-1" />
+                Health
+              </TabsTrigger>
+            )}
             <TabsTrigger value="network">
               <Icon icon="mdi:signal" className="w-4 h-4 mr-1" />
               Network
@@ -179,6 +215,12 @@ export default function DeviceDetailDialog({
               <Icon icon="mdi:map-marker" className="w-4 h-4 mr-1" />
               Location
             </TabsTrigger>
+            {device.deviceType === "EDC" && (
+              <TabsTrigger value="apps">
+                <Icon icon="mdi:apps" className="w-4 h-4 mr-1" />
+                Apps
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* ================= TAB: INFO ================= */}
@@ -221,14 +263,25 @@ export default function DeviceDetailDialog({
                 value={device.model || "-"}
               />
               <InfoCard
-                icon="mdi:chip"
-                label="Firmware"
-                value={device.firmware || "-"}
+                icon="mdi:tag"
+                label="Device Type"
+                value={device.deviceType || "SOUNDBOX"}
+              />
+              <InfoCard
+                icon="mdi:application"
+                label="App Version"
+                value={device.appVersion || "-"}
               />
               <InfoCard
                 icon="mdi:store"
                 label="Merchant"
                 value={device.merchant?.name || "-"}
+              />
+              <InfoCard
+                icon="mdi:map-marker-radius"
+                label="Location Name"
+                value={device.locationName || "-"}
+                wrap
               />
 
               {/* Battery dengan icon */}
@@ -375,6 +428,90 @@ export default function DeviceDetailDialog({
             )}
           </TabsContent>
 
+          {device.deviceType === "EDC" && (
+            <TabsContent value="health" className="space-y-4 mt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <InfoCard
+                  icon="mdi:heart-pulse"
+                  label="Health Score"
+                  value={
+                    typeof device.lastHealthScore === "number"
+                      ? `${device.lastHealthScore}/100`
+                      : "-"
+                  }
+                />
+                <InfoCard
+                  icon="mdi:chip"
+                  label="Android Version"
+                  value={device.androidVersion || "-"}
+                />
+                <InfoCard
+                  icon="mdi:cpu-64-bit"
+                  label="Component Score"
+                  value={
+                    typeof device.componentScore === "number"
+                      ? `${device.componentScore}/100`
+                      : "-"
+                  }
+                />
+                <InfoCard
+                  icon="mdi:clock-outline"
+                  label="Telemetry Updated"
+                  value={
+                    device.lastSeenAt
+                      ? new Date(device.lastSeenAt).toLocaleString("id-ID")
+                      : "-"
+                  }
+                />
+              </div>
+
+              <SectionList
+                title="Insight Kesehatan"
+                emptyText="Belum ada insight kesehatan dari device."
+                items={healthInsights.map((item, idx) => ({
+                  key: `health-${idx}`,
+                  title: item.title || "-",
+                  status: item.status || "-",
+                  detail: item.detail || "-",
+                  isWarning: !!item.isWarning,
+                }))}
+              />
+
+              <SectionList
+                title="Diagnostik Komponen"
+                emptyText="Belum ada diagnostik komponen dari device."
+                items={componentDiagnostics.map((item, idx) => ({
+                  key: `diag-${idx}`,
+                  title: item.title || "-",
+                  status: item.status || "-",
+                  detail: item.detail || "-",
+                  isWarning: !!item.isWarning,
+                }))}
+              />
+
+              {device.rawInfo && Object.keys(device.rawInfo).length > 0 && (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                  <h4 className="mb-3 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                    Raw Device Info
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {Object.entries(device.rawInfo).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="rounded bg-white p-2 dark:bg-slate-900"
+                      >
+                        <p className="text-gray-500">{key}</p>
+                        <p className="font-medium text-gray-900 dark:text-gray-100 break-all">
+                          {String(value)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          )}
+
           {/* ================= TAB: NETWORK ================= */}
           <TabsContent value="network" className="space-y-4 mt-4">
             {/* Connection Type */}
@@ -508,30 +645,11 @@ export default function DeviceDetailDialog({
                 longitude={hasValidLocation ? device.longitude : undefined}
                 accuracy={hasValidLocation ? device.accuracy : undefined}
                 locationSource={device.locationSource}
+                locationName={device.locationName || undefined}
                 deviceName={device.deviceCode}
                 className="h-full"
               />
             </div>
-
-            {/* Source mismatch warning */}
-            {device.latitude && device.longitude && !isLocationSourceValid && (
-              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                <div className="flex items-center gap-2">
-                  <Icon icon="mdi:alert" className="w-5 h-5 text-yellow-600" />
-                  <div>
-                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                      Lokasi belum di-resolve untuk mode{" "}
-                      {isWifiMode ? "WiFi" : "SIM"}
-                    </p>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                      {isWifiMode
-                        ? "Menunggu data WiFi AP untuk resolve lokasi via Mozilla MLS"
-                        : "Menunggu data Cell Tower untuk resolve lokasi via OpenCellID"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Location Details */}
             <div className="grid grid-cols-2 gap-4">
@@ -549,7 +667,7 @@ export default function DeviceDetailDialog({
                 icon="mdi:crosshairs-gps"
                 label="Location Source"
                 value={
-                  hasValidLocation
+                  hasValidLocation && device.locationSource
                     ? getLocationSourceLabel(device.locationSource)
                     : "-"
                 }
@@ -573,6 +691,12 @@ export default function DeviceDetailDialog({
                     ? new Date(device.locationUpdatedAt).toLocaleString("id-ID")
                     : "-"
                 }
+              />
+              <InfoCard
+                icon="mdi:map-marker-radius"
+                label="Location Name"
+                value={device.locationName || "-"}
+                wrap
               />
             </div>
 
@@ -634,8 +758,7 @@ export default function DeviceDetailDialog({
                     )}
                     {!hasValidLocation && (
                       <p className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-2">
-                        ⚠️ Koordinat belum tersedia. Backend akan mencoba
-                        resolve dari OpenCellID.
+                        ⚠️ Koordinat belum tersedia dari device.
                       </p>
                     )}
                   </div>
@@ -702,6 +825,62 @@ export default function DeviceDetailDialog({
               </div>
             )}
           </TabsContent>
+
+          {device.deviceType === "EDC" && (
+            <TabsContent value="apps" className="space-y-4 mt-4">
+              <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-slate-900">
+                <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    Installed Apps
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    Daftar aplikasi yang dilaporkan device.
+                  </p>
+                </div>
+                <div className="max-h-[320px] overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 text-left uppercase text-[11px] text-gray-500 dark:bg-slate-800">
+                      <tr>
+                        <th className="px-4 py-2">App</th>
+                        <th className="px-4 py-2">Package</th>
+                        <th className="px-4 py-2">Version</th>
+                        <th className="px-4 py-2">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {installedApps.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-4 text-gray-500" colSpan={4}>
+                            Belum ada data aplikasi terinstal.
+                          </td>
+                        </tr>
+                      ) : (
+                        installedApps.map((app, idx) => (
+                          <tr
+                            key={`${app.packageName || app.name || "app"}-${idx}`}
+                            className="border-t border-gray-100 dark:border-gray-800"
+                          >
+                            <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">
+                              {app.name || "-"}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600 dark:text-gray-300 break-all">
+                              {app.packageName || "-"}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
+                              {app.versionName || "-"}
+                            </td>
+                            <td className="px-4 py-2 text-gray-600 dark:text-gray-300">
+                              {app.isSystemApp ? "System" : "User"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
       </DialogContent>
     </Dialog>
@@ -712,10 +891,12 @@ function InfoCard({
   icon,
   label,
   value,
+  wrap = false,
 }: {
   icon: string;
   label: string;
   value: string;
+  wrap?: boolean;
 }) {
   return (
     <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
@@ -724,8 +905,8 @@ function InfoCard({
         {label}
       </div>
       <p
-        className="font-bold text-gray-900 dark:text-gray-100 truncate"
-        title={value}
+        className={`font-bold text-gray-900 dark:text-gray-100 ${wrap ? "whitespace-normal break-words" : "truncate"}`}
+        title={wrap ? undefined : value}
       >
         {value}
       </p>
@@ -751,6 +932,56 @@ function CellTowerCard({
       <p className="text-sm font-mono font-bold text-gray-900 dark:text-gray-100">
         {value ?? "-"}
       </p>
+    </div>
+  );
+}
+
+function SectionList({
+  title,
+  emptyText,
+  items,
+}: {
+  title: string;
+  emptyText: string;
+  items: Array<{
+    key: string;
+    title: string;
+    status: string;
+    detail: string;
+    isWarning: boolean;
+  }>;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-slate-900">
+      <h4 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+        {title}
+      </h4>
+      {items.length === 0 ? (
+        <p className="text-xs text-gray-500">{emptyText}</p>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div
+              key={item.key}
+              className="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {item.title}
+                </p>
+                <span
+                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${item.isWarning ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"}`}
+                >
+                  {item.status}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                {item.detail}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

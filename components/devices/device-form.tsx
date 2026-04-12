@@ -19,6 +19,22 @@ type Device = {
   model: string;
   status: string;
   merchantId: string;
+  deviceType?: string;
+  firmware?: string;
+  batteryLevel?: number;
+  signal?: number;
+  ipAddress?: string;
+  commode?: string;
+  carrier?: string;
+  totalMemory?: number;
+  availableMemory?: number;
+  totalStorage?: number;
+  availableStorage?: number;
+  androidVersion?: string;
+  securityPatch?: string;
+  appVersion?: string;
+  agentVersion?: string;
+  lastHealthScore?: number;
   merchant?: {
     id: string;
     name: string;
@@ -41,11 +57,12 @@ type CurrentUser = {
 };
 
 type DeviceFormProps = {
+  mode?: "edc" | "soundbox";
   device?: Device | null;
   onSuccess: () => void;
 };
 
-export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
+export default function DeviceForm({ mode = "edc", device, onSuccess }: DeviceFormProps) {
   const [deviceCode, setDeviceCode] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [model, setModel] = useState("");
@@ -176,6 +193,7 @@ export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
           deviceId: device.id,
           model,
           status,
+          deviceType: mode === "edc" ? "EDC" : "SOUNDBOX",
           currentUser,
           deviceMerchant: device?.merchant,
         });
@@ -183,7 +201,11 @@ export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
         const res = await fetch(`/api/devices/${device.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model, status }),
+          body: JSON.stringify({
+            model,
+            status,
+            deviceType: mode === "edc" ? "EDC" : "SOUNDBOX",
+          }),
         });
 
         if (!res.ok) {
@@ -206,15 +228,18 @@ export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
 
       setLoading(true);
       try {
+        const payload: Record<string, unknown> = {
+          deviceCode,
+          serialNumber,
+          model,
+          merchantId,
+          deviceType: mode === "edc" ? "EDC" : "SOUNDBOX",
+        };
+
         const res = await fetch("/api/devices", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceCode,
-            serialNumber,
-            model,
-            merchantId,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (!res.ok) {
@@ -242,7 +267,7 @@ export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
       {isEdit ? (
         <>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Device Code</label>
+            <label className="text-sm font-medium">{mode === "soundbox" ? "Soundbox Code" : "Device Code"}</label>
             <Input
               placeholder="Device code"
               value={deviceCode}
@@ -274,7 +299,7 @@ export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
       ) : (
         <>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Device Code</label>
+            <label className="text-sm font-medium">{mode === "soundbox" ? "Soundbox Code" : "Device Code"}</label>
             <Input
               placeholder="Device code (e.g., DEV001)"
               value={deviceCode}
@@ -343,7 +368,11 @@ export default function DeviceForm({ device, onSuccess }: DeviceFormProps) {
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Loading..." : isEdit ? "Update Device" : "Add Device"}
+        {loading
+          ? "Loading..."
+          : isEdit
+            ? `Update ${mode === "soundbox" ? "Soundbox" : "Device"}`
+            : `Add ${mode === "soundbox" ? "Soundbox" : "Device"}`}
       </Button>
     </form>
   );

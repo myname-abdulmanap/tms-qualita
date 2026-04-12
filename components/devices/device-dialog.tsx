@@ -24,6 +24,7 @@ type Device = {
 type DeviceDialogProps = {
   open: boolean;
   device?: Device | null;
+  mode?: "edc" | "soundbox";
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -31,16 +32,19 @@ type DeviceDialogProps = {
 export default function DeviceDialog({
   open,
   device,
+  mode = "edc",
   onClose,
   onSuccess,
 }: DeviceDialogProps) {
+  const label = mode === "soundbox" ? "Soundbox" : "Device";
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{device ? "Edit Device" : "Add New Device"}</DialogTitle>
+          <DialogTitle>{device ? `Edit ${label}` : `Add New ${label}`}</DialogTitle>
         </DialogHeader>
-        <DeviceForm device={device} onSuccess={onSuccess} />
+        <DeviceForm mode={mode} device={device} onSuccess={onSuccess} />
       </DialogContent>
     </Dialog>
   );

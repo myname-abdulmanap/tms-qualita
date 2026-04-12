@@ -25,13 +25,13 @@ export default async function DevicesPage() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Device Management</h1>
+        <h1 className="text-3xl font-bold">Soundbox Management</h1>
         <p className="text-gray-600 mt-2">
-          Manage all your EDC devices and terminals
+          Manage all your Soundbox devices and terminals
         </p>
       </div>
 
-      <DeviceTable />
+      <DeviceTable mode="soundbox" basePath="/devices" />
     </div>
   );
 }
