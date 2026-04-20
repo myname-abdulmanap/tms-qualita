@@ -215,14 +215,23 @@ export default function EdcApkDashboard() {
         body: form,
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await res.json()
+        : { error: await res.text() };
 
       if (res.ok) {
         setUploadOpen(false);
         resetUploadForm();
         await fetchApks();
       } else {
-        setUploadError(data.error || "Upload gagal");
+        const rawError = String(data?.error || "");
+        const isTooLarge = res.status === 413 || /entity too large|content too large|request entity too large/i.test(rawError);
+        setUploadError(
+          isTooLarge
+            ? "Ukuran file terlalu besar untuk server gateway saat ini. Hubungi admin untuk menaikkan upload limit."
+            : rawError || "Upload gagal"
+        );
       }
     } catch (e) {
       console.error("Upload error:", e);
