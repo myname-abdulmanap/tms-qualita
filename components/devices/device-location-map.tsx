@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  hasUsableLocationName,
+  reverseGeocodeLocation,
+} from "@/lib/reverse-geocode";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LeafletMap = any;
@@ -94,9 +98,40 @@ export default function DeviceLocationMap({
   const markerRef = useRef<LeafletMarker>(null);
   const circleRef = useRef<LeafletCircle>(null);
   const initializedRef = useRef(false);
+  const [resolvedLocation, setResolvedLocation] = useState<{
+    key: string;
+    name: string | null;
+  } | null>(null);
 
   const sourceInfo = getSourceInfo(locationSource);
   const hasLocation = latitude && longitude;
+  const locationKey =
+    Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? `${latitude!.toFixed(5)},${longitude!.toFixed(5)}`
+      : null;
+  const effectiveLocationName = hasUsableLocationName(locationName)
+    ? locationName!.trim()
+    : locationKey && resolvedLocation?.key === locationKey
+      ? resolvedLocation.name
+      : null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (hasUsableLocationName(locationName)) return;
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+    const key = `${latitude!.toFixed(5)},${longitude!.toFixed(5)}`;
+
+    reverseGeocodeLocation(latitude, longitude).then((name) => {
+      if (!cancelled) setResolvedLocation({ key, name });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [locationName, latitude, longitude]);
 
   // Initialize map
   const initMap = useCallback(() => {
@@ -137,7 +172,7 @@ export default function DeviceLocationMap({
           <span style="font-size: 11px;">
             📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
             ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + " km" : accuracy + " m"}` : ""}
-            ${locationName ? `<br/>🏷️ ${locationName}` : ""}
+            ${effectiveLocationName ? `<br/>🏷️ ${effectiveLocationName}` : ""}
           </span>
         </div>
       `;
@@ -177,7 +212,7 @@ export default function DeviceLocationMap({
         }
       }
     }
-  }, [latitude, longitude, accuracy, locationName, deviceName, sourceInfo]);
+  }, [latitude, longitude, accuracy, effectiveLocationName, deviceName, sourceInfo]);
 
   // Load Leaflet and initialize map
   useEffect(() => {
@@ -235,7 +270,7 @@ export default function DeviceLocationMap({
           <span style="font-size: 11px;">
             📍 ${latitude.toFixed(6)}, ${longitude.toFixed(6)}
             ${accuracy ? `<br/>🎯 Akurasi: ~${accuracy >= 1000 ? (accuracy / 1000).toFixed(1) + " km" : accuracy + " m"}` : ""}
-            ${locationName ? `<br/>🏷️ ${locationName}` : ""}
+            ${effectiveLocationName ? `<br/>🏷️ ${effectiveLocationName}` : ""}
           </span>
         </div>
       `;
@@ -286,7 +321,7 @@ export default function DeviceLocationMap({
         circleRef.current = null;
       }
     }
-  }, [latitude, longitude, accuracy, locationName, deviceName, sourceInfo]);
+  }, [latitude, longitude, accuracy, effectiveLocationName, deviceName, sourceInfo]);
 
   return (
     <div className={`relative ${className}`}>

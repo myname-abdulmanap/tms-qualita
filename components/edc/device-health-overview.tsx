@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@iconify/react";
+import ResolvedLocationName from "@/components/devices/resolved-location-name";
 
 type Device = {
   id: string;
@@ -263,19 +264,18 @@ export default function DeviceHealthOverview() {
                       </p>
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      {device.locationName ? (
-                        <p className="text-xs text-gray-700 max-w-[160px]">
-                          {device.locationName}
-                        </p>
-                      ) : device.latitude != null &&
-                        device.longitude != null ? (
-                        <p className="text-xs text-gray-500">
-                          {device.latitude.toFixed(5)},{" "}
-                          {device.longitude.toFixed(5)}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-gray-400">-</p>
-                      )}
+                      <p className="text-xs text-gray-700 max-w-[220px] line-clamp-2">
+                        <ResolvedLocationName
+                          locationName={device.locationName}
+                          latitude={device.latitude ?? undefined}
+                          longitude={device.longitude ?? undefined}
+                          fallback={
+                            device.latitude != null && device.longitude != null
+                              ? `${device.latitude.toFixed(5)}, ${device.longitude.toFixed(5)}`
+                              : "-"
+                          }
+                        />
+                      </p>
                       {device.locationSource && (
                         <p className="text-xs text-gray-400">
                           {device.locationSource}

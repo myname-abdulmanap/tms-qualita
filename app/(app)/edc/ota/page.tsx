@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import OtaDashboard from "@/components/ota/ota-dashboard";
+import EdcApkDashboard from "@/components/ota/edc-apk-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +15,14 @@ export default async function EdcOtaPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">EDC OTA & App Update</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          EDC Agent APK Management
+        </h1>
         <p className="mt-2 text-gray-500">
-          Jalankan OTA firmware dan update aplikasi EDC setelah status device dinyatakan sehat dari halaman Device Info & Health.
+          Upload dan kelola versi APK untuk aplikasi TMS Agent EDC devices.
         </p>
       </div>
-      <OtaDashboard />
+      <EdcApkDashboard />
     </div>
   );
 }

@@ -9,6 +9,11 @@ import {
 import { Icon } from "@iconify/react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+import {
+  hasUsableLocationName,
+  reverseGeocodeLocation,
+} from "@/lib/reverse-geocode";
 
 // Dynamic import untuk map (client-side only)
 const DeviceLocationMap = dynamic(() => import("./device-location-map"), {
@@ -153,30 +158,63 @@ export default function DeviceDetailDialog({
   device: Device | null;
   onClose: () => void;
 }) {
-  if (!device) return null;
+  const online = isOnline(device?.lastSeenAt);
 
-  const online = isOnline(device.lastSeenAt);
-
-  const isWifiMode = device.commode?.toUpperCase() === "WIFI";
+  const isWifiMode = device?.commode?.toUpperCase() === "WIFI";
   const hasValidLocation =
-    typeof device.latitude === "number" && typeof device.longitude === "number";
+    typeof device?.latitude === "number" && typeof device?.longitude === "number";
 
   // Check if any cell tower data exists (not null/undefined, and has meaningful values)
   const hasCellTower =
     !isWifiMode &&
-    device.mcc !== null &&
-    device.mcc !== undefined &&
+    device?.mcc !== null &&
+    device?.mcc !== undefined &&
     device.mcc > 0;
 
-  const healthInsights = Array.isArray(device.healthInsights)
+  const healthInsights = Array.isArray(device?.healthInsights)
     ? device.healthInsights
     : [];
-  const componentDiagnostics = Array.isArray(device.componentDiagnostics)
+  const componentDiagnostics = Array.isArray(device?.componentDiagnostics)
     ? device.componentDiagnostics
     : [];
-  const installedApps = Array.isArray(device.installedApps)
+  const installedApps = Array.isArray(device?.installedApps)
     ? device.installedApps
     : [];
+  const [resolvedLocation, setResolvedLocation] = useState<{
+    key: string;
+    name: string | null;
+  } | null>(null);
+  const locationKey = device && hasValidLocation
+    ? `${device.latitude!.toFixed(5)},${device.longitude!.toFixed(5)}`
+    : null;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!device) return;
+
+    if (hasUsableLocationName(device.locationName)) return;
+
+    if (!hasValidLocation) return;
+
+    const key = `${device.latitude!.toFixed(5)},${device.longitude!.toFixed(5)}`;
+
+    reverseGeocodeLocation(device.latitude, device.longitude).then((name) => {
+      if (!cancelled) setResolvedLocation({ key, name });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [device, hasValidLocation]);
+
+  const locationLabel = hasUsableLocationName(device?.locationName)
+    ? device.locationName!.trim()
+    : locationKey && resolvedLocation?.key === locationKey
+      ? resolvedLocation.name || "-"
+      : "-";
+
+  if (!device) return null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -280,7 +318,7 @@ export default function DeviceDetailDialog({
               <InfoCard
                 icon="mdi:map-marker-radius"
                 label="Location Name"
-                value={device.locationName || "-"}
+                value={locationLabel}
                 wrap
               />
 
@@ -456,7 +494,7 @@ export default function DeviceDetailDialog({
                 />
                 <InfoCard
                   icon="mdi:clock-outline"
-                  label="Telemetry Updated"
+                  label="Heartbeat Updated"
                   value={
                     device.lastSeenAt
                       ? new Date(device.lastSeenAt).toLocaleString("id-ID")
@@ -645,7 +683,7 @@ export default function DeviceDetailDialog({
                 longitude={hasValidLocation ? device.longitude : undefined}
                 accuracy={hasValidLocation ? device.accuracy : undefined}
                 locationSource={device.locationSource}
-                locationName={device.locationName || undefined}
+                locationName={locationLabel}
                 deviceName={device.deviceCode}
                 className="h-full"
               />
@@ -695,7 +733,7 @@ export default function DeviceDetailDialog({
               <InfoCard
                 icon="mdi:map-marker-radius"
                 label="Location Name"
-                value={device.locationName || "-"}
+                value={locationLabel}
                 wrap
               />
             </div>

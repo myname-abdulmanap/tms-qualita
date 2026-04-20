@@ -6,6 +6,11 @@ import { Icon } from "@iconify/react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
+import {
+  hasUsableLocationName,
+  reverseGeocodeLocation,
+} from "@/lib/reverse-geocode";
+import EdcApkList from "@/components/edc/edc-apk-list";
 
 const DeviceLocationMap = dynamic(
   () => import("@/components/devices/device-location-map"),
@@ -237,6 +242,10 @@ export default function EdcDeviceDetailPage() {
   const [device, setDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resolvedLocation, setResolvedLocation] = useState<{
+    key: string;
+    name: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -250,6 +259,27 @@ export default function EdcDeviceDetailPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!device) return;
+
+    if (hasUsableLocationName(device.locationName)) return;
+
+    if (!Number.isFinite(device.latitude) || !Number.isFinite(device.longitude))
+      return;
+
+    const key = `${device.latitude!.toFixed(5)},${device.longitude!.toFixed(5)}`;
+
+    reverseGeocodeLocation(device.latitude, device.longitude).then((name) => {
+      if (!cancelled) setResolvedLocation({ key, name });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [device]);
 
   if (loading) {
     return (
@@ -302,6 +332,14 @@ export default function EdcDeviceDetailPage() {
   const installedApps = Array.isArray(device.installedApps)
     ? device.installedApps
     : [];
+  const locationKey = hasValidLocation
+    ? `${device.latitude!.toFixed(5)},${device.longitude!.toFixed(5)}`
+    : null;
+  const locationLabel = hasUsableLocationName(device.locationName)
+    ? device.locationName!.trim()
+    : locationKey && resolvedLocation?.key === locationKey
+      ? resolvedLocation.name || "-"
+      : "-";
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -408,7 +446,7 @@ export default function EdcDeviceDetailPage() {
 
       {/* ── Tabs ── */}
       <Tabs defaultValue="info" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 rounded-xl bg-gray-100 dark:bg-slate-800 p-1 h-auto">
+        <TabsList className="grid w-full grid-cols-6 rounded-xl bg-gray-100 dark:bg-slate-800 p-1 h-auto">
           <TabsTrigger
             value="info"
             className="rounded-lg py-2 text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
@@ -443,6 +481,13 @@ export default function EdcDeviceDetailPage() {
           >
             <Icon icon="mdi:apps" className="w-4 h-4 mr-1.5" />
             Apps
+          </TabsTrigger>
+          <TabsTrigger
+            value="apk-updates"
+            className="rounded-lg py-2 text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
+          >
+            <Icon icon="mdi:download" className="w-4 h-4 mr-1.5" />
+            APK
           </TabsTrigger>
         </TabsList>
 
@@ -482,7 +527,7 @@ export default function EdcDeviceDetailPage() {
             <InfoCard
               icon="mdi:map-marker-radius"
               label="Location Name"
-              value={device.locationName || "-"}
+              value={locationLabel}
               wrap
             />
             <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
@@ -619,7 +664,7 @@ export default function EdcDeviceDetailPage() {
             />
             <InfoCard
               icon="mdi:clock-outline"
-              label="Telemetry Updated"
+              label="Heartbeat Updated"
               value={
                 device.lastSeenAt
                   ? new Date(device.lastSeenAt).toLocaleString("id-ID")
@@ -794,7 +839,7 @@ export default function EdcDeviceDetailPage() {
               longitude={hasValidLocation ? device.longitude : undefined}
               accuracy={hasValidLocation ? device.accuracy : undefined}
               locationSource={device.locationSource}
-              locationName={device.locationName || undefined}
+              locationName={locationLabel}
               deviceName={device.deviceCode}
               className="h-full"
             />
@@ -843,7 +888,7 @@ export default function EdcDeviceDetailPage() {
             <InfoCard
               icon="mdi:map-marker-radius"
               label="Nama Lokasi"
-              value={device.locationName || "-"}
+              value={locationLabel}
               wrap
             />
           </div>
@@ -927,6 +972,14 @@ export default function EdcDeviceDetailPage() {
               </table>
             </div>
           </div>
+        </TabsContent>
+
+        {/* ── TAB: APK UPDATES ── */}
+        <TabsContent value="apk-updates" className="mt-6">
+          <EdcApkList
+            deviceSn={device.serialNumber}
+            currentVersion={device.appVersion}
+          />
         </TabsContent>
       </Tabs>
     </div>

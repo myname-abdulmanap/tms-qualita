@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
+import ResolvedLocationName from "@/components/devices/resolved-location-name";
 
 type Device = {
   id: string;
@@ -316,11 +317,15 @@ export default function EdcDeviceMapPage() {
                         <p className="text-xs text-gray-500 mt-0.5 truncate">
                           {device.merchant?.name || "No Merchant"}
                         </p>
-                        {device.locationName && (
-                          <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
-                            📍 {device.locationName}
-                          </p>
-                        )}
+                        <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">
+                          📍{" "}
+                          <ResolvedLocationName
+                            locationName={device.locationName}
+                            latitude={device.latitude}
+                            longitude={device.longitude}
+                            fallback="-"
+                          />
+                        </p>
                       </div>
                       <span
                         className={`ml-2 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${
