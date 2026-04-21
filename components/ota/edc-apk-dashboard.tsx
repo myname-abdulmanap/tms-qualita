@@ -263,11 +263,13 @@ export default function EdcApkDashboard() {
         const rawError = String(data?.error || "");
         const isTooLarge =
           res.status === 413 ||
-          /entity too large|content too large|request entity too large|payload too large/i.test(rawError);
+          /entity too large|content too large|request entity too large|payload too large/i.test(
+            rawError,
+          );
         setUploadError(
           isTooLarge
             ? "Ukuran file terlalu besar untuk server gateway saat ini. Hubungi admin untuk menaikkan upload limit."
-            : rawError || "Upload gagal"
+            : rawError || "Upload gagal",
         );
       }
     } catch (e) {

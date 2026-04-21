@@ -48,6 +48,10 @@ export default function MqttConfigPanel() {
   const [passwordInput, setPasswordInput] = useState("");
   const [targetSn, setTargetSn] = useState("");
   const [sendingCmd, setSendingCmd] = useState(false);
+  const [otaAppName, setOtaAppName] = useState("Qualita Agent");
+  const [otaVersion, setOtaVersion] = useState("");
+  const [otaPackageName, setOtaPackageName] = useState("");
+  const [otaDownloadUrl, setOtaDownloadUrl] = useState("");
   const [logs, setLogs] = useState<CommandLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [aclTemplate, setAclTemplate] = useState<AclTemplate | null>(null);
@@ -357,38 +361,125 @@ export default function MqttConfigPanel() {
           </label>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <button
-            className="rounded border px-3 py-1.5 text-sm"
+            className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => sendCommand("PING")}
             disabled={sendingCmd}
           >
-            Send PING
+            <div className="text-sm font-semibold text-emerald-900">PING</div>
+            <div className="mt-1 text-xs text-emerald-800">
+              Cek koneksi online device secara cepat.
+            </div>
           </button>
+
           <button
-            className="rounded border px-3 py-1.5 text-sm"
+            className="rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-left transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => sendCommand("FORCE_REPORT")}
             disabled={sendingCmd}
           >
-            Send FORCE_REPORT
+            <div className="text-sm font-semibold text-blue-900">
+              FORCE_REPORT
+            </div>
+            <div className="mt-1 text-xs text-blue-800">
+              Paksa device kirim telemetry sekarang.
+            </div>
           </button>
+
           <button
-            className="rounded border px-3 py-1.5 text-sm"
-            onClick={() =>
-              sendCommand("UPDATE_MQTT_HOST", { host: config.host })
-            }
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => sendCommand("UPDATE_MQTT_HOST", { host: config.host })}
             disabled={sendingCmd}
           >
-            Push Host To App
+            <div className="text-sm font-semibold text-amber-900">
+              UPDATE_MQTT_HOST
+            </div>
+            <div className="mt-1 text-xs text-amber-800">
+              Push host MQTT saat ini ke aplikasi agent.
+            </div>
           </button>
+
           <button
-            className="rounded border px-3 py-1.5 text-sm"
+            className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-left transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => sendCommand("RESTART_AGENT")}
             disabled={sendingCmd}
           >
-            Send RESTART_AGENT
+            <div className="text-sm font-semibold text-rose-900">
+              RESTART_AGENT
+            </div>
+            <div className="mt-1 text-xs text-rose-800">
+              Restart service agent di device target.
+            </div>
+          </button>
+
+          <button
+            className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-3 text-left transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() =>
+              sendCommand("APK_UPDATE_AVAILABLE", {
+                appName: otaAppName.trim() || "Qualita Agent",
+                version: otaVersion.trim() || "latest",
+                packageName: otaPackageName.trim() || undefined,
+                downloadUrl: otaDownloadUrl.trim() || undefined,
+              })
+            }
+            disabled={sendingCmd}
+          >
+            <div className="text-sm font-semibold text-violet-900">
+              APK_UPDATE_AVAILABLE
+            </div>
+            <div className="mt-1 text-xs text-violet-800">
+              Push notifikasi OTA update APK ke device.
+            </div>
           </button>
         </div>
+
+        <div className="mt-3 grid gap-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3 md:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-violet-700">OTA App Name</span>
+            <input
+              className="w-full rounded border border-violet-200 bg-white px-2 py-1"
+              placeholder="Qualita Agent"
+              value={otaAppName}
+              onChange={(e) => setOtaAppName(e.target.value)}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-violet-700">OTA Version</span>
+            <input
+              className="w-full rounded border border-violet-200 bg-white px-2 py-1"
+              placeholder="contoh: 1.2.0"
+              value={otaVersion}
+              onChange={(e) => setOtaVersion(e.target.value)}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-violet-700">Package Name (optional)</span>
+            <input
+              className="w-full rounded border border-violet-200 bg-white px-2 py-1"
+              placeholder="com.qualitaindonesia.qualitatms"
+              value={otaPackageName}
+              onChange={(e) => setOtaPackageName(e.target.value)}
+            />
+          </label>
+
+          <label className="text-sm">
+            <span className="mb-1 block text-xs text-violet-700">Download URL (optional)</span>
+            <input
+              className="w-full rounded border border-violet-200 bg-white px-2 py-1"
+              placeholder="https://.../apk/id/download?sn=..."
+              value={otaDownloadUrl}
+              onChange={(e) => setOtaDownloadUrl(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          {sendingCmd
+            ? "Mengirim command ke device..."
+            : "Klik salah satu tombol command di atas untuk eksekusi cepat."}
+        </p>
       </div>
 
       <div className="rounded-lg border bg-white p-4">
