@@ -10,7 +10,6 @@ import {
   hasUsableLocationName,
   reverseGeocodeLocation,
 } from "@/lib/reverse-geocode";
-import EdcApkList from "@/components/edc/edc-apk-list";
 
 const DeviceLocationMap = dynamic(
   () => import("@/components/devices/device-location-map"),
@@ -446,7 +445,7 @@ export default function EdcDeviceDetailPage() {
 
       {/* ── Tabs ── */}
       <Tabs defaultValue="info" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 rounded-xl bg-gray-100 dark:bg-slate-800 p-1 h-auto">
+        <TabsList className="grid w-full grid-cols-5 rounded-xl bg-gray-100 dark:bg-slate-800 p-1 h-auto">
           <TabsTrigger
             value="info"
             className="rounded-lg py-2 text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
@@ -481,13 +480,6 @@ export default function EdcDeviceDetailPage() {
           >
             <Icon icon="mdi:apps" className="w-4 h-4 mr-1.5" />
             Apps
-          </TabsTrigger>
-          <TabsTrigger
-            value="apk-updates"
-            className="rounded-lg py-2 text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm"
-          >
-            <Icon icon="mdi:download" className="w-4 h-4 mr-1.5" />
-            APK
           </TabsTrigger>
         </TabsList>
 
@@ -974,13 +966,6 @@ export default function EdcDeviceDetailPage() {
           </div>
         </TabsContent>
 
-        {/* ── TAB: APK UPDATES ── */}
-        <TabsContent value="apk-updates" className="mt-6">
-          <EdcApkList
-            deviceSn={device.serialNumber}
-            currentVersion={device.appVersion}
-          />
-        </TabsContent>
       </Tabs>
     </div>
   );
