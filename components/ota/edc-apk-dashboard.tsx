@@ -194,6 +194,27 @@ export default function EdcApkDashboard() {
     setUploading(false);
   }
 
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadFile(file);
+    setUploadError("");
+
+    // Auto-extract version from filename (e.g., "app-1.2.3.apk" -> "1.2.3")
+    const filename = file.name;
+    const versionMatch = filename.match(/[\.-_]v?(\d+\.\d+(?:\.\d+)?)/i);
+    if (versionMatch && versionMatch[1]) {
+      setUploadVersion(versionMatch[1]);
+    }
+
+    // Auto-extract app name from filename (e.g., "QualitaApp2-1.0.0.apk" -> "QualitaApp2")
+    const nameMatch = filename.match(/^([a-zA-Z0-9_-]+?)[\.-]/);
+    if (nameMatch && nameMatch[1]) {
+      setUploadAppName(nameMatch[1]);
+    }
+  }
+
   async function handleUpload() {
     if (!uploadFile || !uploadVersion) {
       setUploadError("File dan version harus diisi");
@@ -474,7 +495,7 @@ export default function EdcApkDashboard() {
                 id="file"
                 type="file"
                 accept=".apk"
-                onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                onChange={handleFileChange}
               />
               {uploadFile && (
                 <p className="mt-2 text-sm text-gray-600">
