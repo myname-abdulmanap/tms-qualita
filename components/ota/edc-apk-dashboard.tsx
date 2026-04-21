@@ -210,8 +210,22 @@ export default function EdcApkDashboard() {
       form.append("version", uploadVersion);
       if (uploadDesc) form.append("description", uploadDesc);
 
-      const res = await fetch("/api/apk/upload", {
+      const tokenRes = await fetch("/api/auth/token");
+      const tokenData = await tokenRes.json();
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
+
+      if (!backendUrl) {
+        throw new Error("NEXT_PUBLIC_BACKEND_URL belum dikonfigurasi");
+      }
+
+      const headers: HeadersInit = {};
+      if (tokenData.token) {
+        headers.Authorization = `Bearer ${tokenData.token}`;
+      }
+
+      const res = await fetch(`${backendUrl}/apk/upload`, {
         method: "POST",
+        headers,
         body: form,
       });
 
@@ -226,7 +240,9 @@ export default function EdcApkDashboard() {
         await fetchApks();
       } else {
         const rawError = String(data?.error || "");
-        const isTooLarge = res.status === 413 || /entity too large|content too large|request entity too large/i.test(rawError);
+        const isTooLarge =
+          res.status === 413 ||
+          /entity too large|content too large|request entity too large|payload too large/i.test(rawError);
         setUploadError(
           isTooLarge
             ? "Ukuran file terlalu besar untuk server gateway saat ini. Hubungi admin untuk menaikkan upload limit."
