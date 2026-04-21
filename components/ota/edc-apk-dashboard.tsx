@@ -100,6 +100,22 @@ function deviceStatusBadge(status: string) {
       color: "bg-green-100 text-green-800 border-green-300",
       label: "Installed",
     },
+    DOWNLOADING: {
+      color: "bg-blue-100 text-blue-800 border-blue-300",
+      label: "Downloading",
+    },
+    DOWNLOADED: {
+      color: "bg-emerald-100 text-emerald-800 border-emerald-300",
+      label: "Downloaded",
+    },
+    FAILED: {
+      color: "bg-red-100 text-red-800 border-red-300",
+      label: "Failed",
+    },
+    CANCELED: {
+      color: "bg-orange-100 text-orange-800 border-orange-300",
+      label: "Canceled",
+    },
   };
   const s = map[status] || {
     color: "bg-gray-100 text-gray-600",

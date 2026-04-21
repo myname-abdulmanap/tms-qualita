@@ -40,6 +40,15 @@ type AclTemplate = {
   note: string;
 };
 
+type OtaApkOption = {
+  id: string;
+  appName: string;
+  version: string;
+  packageName?: string | null;
+  downloadUrl?: string | null;
+  isActive?: boolean;
+};
+
 export default function MqttConfigPanel() {
   const [config, setConfig] = useState<Config | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
@@ -48,6 +57,9 @@ export default function MqttConfigPanel() {
   const [passwordInput, setPasswordInput] = useState("");
   const [targetSn, setTargetSn] = useState("");
   const [sendingCmd, setSendingCmd] = useState(false);
+  const [otaApkOptions, setOtaApkOptions] = useState<OtaApkOption[]>([]);
+  const [selectedOtaApkId, setSelectedOtaApkId] = useState("");
+  const [loadingOtaApkOptions, setLoadingOtaApkOptions] = useState(false);
   const [otaAppName, setOtaAppName] = useState("Qualita Agent");
   const [otaVersion, setOtaVersion] = useState("");
   const [otaPackageName, setOtaPackageName] = useState("");
@@ -74,6 +86,47 @@ export default function MqttConfigPanel() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  const loadOtaApkOptions = async () => {
+    setLoadingOtaApkOptions(true);
+    try {
+      const res = await fetch("/api/apk");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load APK list");
+
+      const list = Array.isArray(data?.data) ? data.data : [];
+      const mapped = list
+        .map((item: any) => ({
+          id: String(item?.id || ""),
+          appName: String(item?.appName || ""),
+          version: String(item?.version || ""),
+          packageName:
+            typeof item?.packageName === "string" ? item.packageName : null,
+          downloadUrl:
+            typeof item?.downloadUrl === "string" ? item.downloadUrl : null,
+          isActive: !!item?.isActive,
+        }))
+        .filter((item: OtaApkOption) => item.id && item.appName && item.version)
+        .sort((a: OtaApkOption, b: OtaApkOption) => {
+          if (a.isActive && !b.isActive) return -1;
+          if (!a.isActive && b.isActive) return 1;
+          return b.version.localeCompare(a.version, undefined, {
+            numeric: true,
+            sensitivity: "base",
+          });
+        });
+
+      setOtaApkOptions(mapped);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingOtaApkOptions(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOtaApkOptions();
   }, []);
 
   const loadLogs = async () => {
@@ -189,6 +242,17 @@ export default function MqttConfigPanel() {
     } finally {
       setSendingCmd(false);
     }
+  };
+
+  const applyOtaApkSelection = (apkId: string) => {
+    setSelectedOtaApkId(apkId);
+    const selected = otaApkOptions.find((item) => item.id === apkId);
+    if (!selected) return;
+
+    setOtaAppName(selected.appName || "Qualita Agent");
+    setOtaVersion(selected.version || "");
+    setOtaPackageName(selected.packageName || "");
+    setOtaDownloadUrl(selected.downloadUrl || "");
   };
 
   if (loading || !config) {
@@ -434,6 +498,41 @@ export default function MqttConfigPanel() {
         </div>
 
         <div className="mt-3 grid gap-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3 md:grid-cols-2">
+          <label className="text-sm md:col-span-2">
+            <span className="mb-1 block text-xs text-violet-700">
+              Pilih APK dari server (autofill)
+            </span>
+            <div className="flex gap-2">
+              <select
+                className="w-full rounded border border-violet-200 bg-white px-2 py-2"
+                value={selectedOtaApkId}
+                onChange={(e) => applyOtaApkSelection(e.target.value)}
+                disabled={loadingOtaApkOptions}
+              >
+                <option value="">
+                  {loadingOtaApkOptions
+                    ? "Memuat APK..."
+                    : "Pilih APK aktif/tersedia"}
+                </option>
+                {otaApkOptions.map((apk) => (
+                  <option key={apk.id} value={apk.id}>
+                    {apk.appName} v{apk.version}
+                    {apk.isActive ? " (Active)" : ""}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={loadOtaApkOptions}
+                disabled={loadingOtaApkOptions}
+                className="shrink-0"
+              >
+                Refresh APK
+              </Button>
+            </div>
+          </label>
+
           <label className="text-sm">
             <span className="mb-1 block text-xs text-violet-700">OTA App Name</span>
             <input
