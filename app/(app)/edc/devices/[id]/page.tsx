@@ -101,20 +101,6 @@ function getBatteryColor(level?: number) {
   if (level >= 20) return "text-yellow-500";
   return "text-red-500";
 }
-function getSignalIcon(signal?: number) {
-  if (signal == null) return "mdi:signal-cellular-outline";
-  if (signal >= -70) return "mdi:signal-cellular-3";
-  if (signal >= -85) return "mdi:signal-cellular-2";
-  if (signal >= -100) return "mdi:signal-cellular-1";
-  return "mdi:signal-cellular-outline";
-}
-function getSignalColor(signal?: number) {
-  if (signal == null) return "text-gray-400";
-  if (signal >= -70) return "text-green-500";
-  if (signal >= -85) return "text-yellow-500";
-  if (signal >= -100) return "text-orange-500";
-  return "text-red-500";
-}
 function getLocationSourceLabel(source?: string) {
   if (!source) return "-";
   const labels: Record<string, string> = {
@@ -397,7 +383,7 @@ export default function EdcDeviceDetailPage() {
         </div>
 
         {/* Quick stats bar */}
-        <div className="grid grid-cols-4 divide-x divide-gray-100 dark:divide-slate-700 bg-gray-50 dark:bg-slate-800">
+        <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-slate-700 bg-gray-50 dark:bg-slate-800">
           <div className="px-4 py-3 text-center">
             <Icon
               icon={getBatteryIcon(device.batteryLevel, device.charging)}
@@ -406,16 +392,6 @@ export default function EdcDeviceDetailPage() {
             <p className="text-xs text-gray-500">Battery</p>
             <p className="text-sm font-bold text-gray-900 dark:text-white">
               {device.batteryLevel != null ? `${device.batteryLevel}%` : "-"}
-            </p>
-          </div>
-          <div className="px-4 py-3 text-center">
-            <Icon
-              icon={getSignalIcon(device.signal)}
-              className={`w-5 h-5 mx-auto mb-1 ${getSignalColor(device.signal)}`}
-            />
-            <p className="text-xs text-gray-500">Signal</p>
-            <p className="text-sm font-bold text-gray-900 dark:text-white">
-              {device.signal != null ? `${device.signal} dBm` : "-"}
             </p>
           </div>
           <div className="px-4 py-3 text-center">
@@ -739,20 +715,6 @@ export default function EdcDeviceDetailPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-4 rounded-xl bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
-              <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5">
-                <Icon
-                  icon={getSignalIcon(device.signal)}
-                  className={`w-4 h-4 ${getSignalColor(device.signal)}`}
-                />
-                <span className="uppercase tracking-wide font-medium">
-                  Signal
-                </span>
-              </div>
-              <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
-                {device.signal != null ? `${device.signal} dBm` : "-"}
-              </p>
-            </div>
             <InfoCard
               icon="mdi:ip-network"
               label="IP Address"

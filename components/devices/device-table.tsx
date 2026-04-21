@@ -14,6 +14,8 @@ type Device = {
   serialNumber: string;
   model: string;
   status: string;
+  lastSeenAt?: string | null;
+  telemetryUpdatedAt?: string | null;
   deviceType?: "EDC" | "SOUNDBOX";
   merchantId: string;
   merchant?: {
@@ -36,6 +38,55 @@ type CurrentUser = {
   merchantId: string | null;
   permissions: string[];
 };
+
+function formatDeviceTime(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("id-ID");
+}
+
+function getFreshnessBadge(value?: string | null) {
+  if (!value) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-slate-800 dark:text-gray-300">
+        NO DATA
+      </span>
+    );
+  }
+
+  const ts = new Date(value).getTime();
+  if (Number.isNaN(ts)) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700 dark:bg-slate-800 dark:text-gray-300">
+        INVALID TIME
+      </span>
+    );
+  }
+
+  const ageMs = Date.now() - ts;
+  if (ageMs <= 5 * 60 * 1000) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">
+        LIVE
+      </span>
+    );
+  }
+
+  if (ageMs <= 30 * 60 * 1000) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+        STALE
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">
+      OFFLINE
+    </span>
+  );
+}
 
 function getDeviceTypeBadge(deviceType?: "EDC" | "SOUNDBOX") {
   if (deviceType === "EDC") {
@@ -161,35 +212,6 @@ export default function DeviceTable({
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return (
-          <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-medium">
-            ACTIVE
-          </span>
-        );
-      case "INACTIVE":
-        return (
-          <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 font-medium">
-            INACTIVE
-          </span>
-        );
-      case "BLOCKED":
-        return (
-          <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-medium">
-            BLOCKED
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-gray-300">
-            {status}
-          </span>
-        );
-    }
-  };
-
   return (
     <>
       <div className="mb-4 flex justify-between items-center">
@@ -236,8 +258,8 @@ export default function DeviceTable({
                 <th className="p-3 text-left text-gray-900 dark:text-white font-bold">
                   Merchant
                 </th>
-                <th className="p-3 text-center text-gray-900 dark:text-white font-bold">
-                  Status
+                <th className="p-3 text-left text-gray-900 dark:text-white font-bold">
+                  Last Seen / Telemetry Update
                 </th>
                 <th className="p-3 text-right text-gray-900 dark:text-white font-bold">
                   Actions
@@ -276,8 +298,22 @@ export default function DeviceTable({
                     <td className="p-3 text-gray-900 dark:text-gray-100">
                       {device.merchant?.name || "-"}
                     </td>
-                    <td className="p-3 text-center">
-                      {getStatusBadge(device.status)}
+                    <td className="p-3 text-gray-900 dark:text-gray-100">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Last Seen
+                        </span>
+                        <div>{getFreshnessBadge(device.lastSeenAt)}</div>
+                        <span className="text-sm">
+                          {formatDeviceTime(device.lastSeenAt)}
+                        </span>
+                        <span className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Telemetry
+                        </span>
+                        <span className="text-sm">
+                          {formatDeviceTime(device.telemetryUpdatedAt)}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-3 text-right space-x-2">
                       {!currentUser?.merchantId && (
