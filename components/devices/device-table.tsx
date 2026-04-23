@@ -132,6 +132,52 @@ function getHeartbeatDescription(value?: string | null): string {
   return `Online ${duration}`;
 }
 
+function getHeartbeatRangeFilterKey(
+  value?: string | null,
+): "0-1" | "2-7" | "8-14" | "15-30" | ">30" | "no-data" {
+  if (!value) return "no-data";
+
+  const ts = new Date(value).getTime();
+  if (Number.isNaN(ts)) return "no-data";
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const ageDays = Math.floor(Math.max(0, Date.now() - ts) / dayMs);
+
+  if (ageDays <= 1) return "0-1";
+  if (ageDays <= 7) return "2-7";
+  if (ageDays <= 14) return "8-14";
+  if (ageDays <= 30) return "15-30";
+  return ">30";
+}
+
+function getHeartbeatSummaryLabel(value?: string | null): string {
+  const rangeKey = getHeartbeatRangeFilterKey(value);
+
+  switch (rangeKey) {
+    case "2-7":
+      return "Last Heartbeat 2-7 hari";
+    case "8-14":
+      return "Last Heartbeat 8-14 hari";
+    case "15-30":
+      return "Last Heartbeat 15-30 hari";
+    case ">30":
+      return "Last Heartbeat > 30 Hari";
+    case "0-1": {
+      const date = value ? new Date(value) : null;
+      const dateLabel = date && !Number.isNaN(date.getTime())
+        ? date.toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+        : "tidak valid";
+      return `Heartbeat ${dateLabel}`;
+    }
+    default:
+      return "Belum ada heartbeat";
+  }
+}
+
 function getDeviceExportRows(devices: Device[]) {
   return devices.map((device, index) => ({
     no: index + 1,
@@ -144,6 +190,58 @@ function getDeviceExportRows(devices: Device[]) {
     heartbeatAt: formatDeviceTime(device.lastSeenAt),
     heartbeatDescription: getHeartbeatDescription(device.lastSeenAt),
   }));
+}
+
+type HeartbeatSummaryRow = {
+  label: string;
+  total: number;
+};
+
+function getHeartbeatSummaryRows(devices: Device[]): HeartbeatSummaryRow[] {
+  const summaryMap = new Map<string, number>();
+
+  for (const device of devices) {
+    const label = getHeartbeatSummaryLabel(device.lastSeenAt);
+    summaryMap.set(label, (summaryMap.get(label) ?? 0) + 1);
+  }
+
+  const priority = (label: string) => {
+    if (label === "Last Heartbeat 2-7 hari") return 1;
+    if (label === "Last Heartbeat 8-14 hari") return 2;
+    if (label === "Last Heartbeat 15-30 hari") return 3;
+    if (label === "Last Heartbeat > 30 Hari") return 4;
+    if (label.startsWith("Heartbeat ")) return 5;
+    if (label === "Belum ada heartbeat") return 6;
+    return 7;
+  };
+
+  return Array.from(summaryMap.entries())
+    .map(([label, total]) => ({ label, total }))
+    .sort((a, b) => {
+      const pa = priority(a.label);
+      const pb = priority(b.label);
+      if (pa !== pb) return pa - pb;
+      return a.label.localeCompare(b.label);
+    });
+}
+
+function getHeartbeatFilterDisplayLabel(filter: string): string {
+  switch (filter) {
+    case "0-1":
+      return "Heartbeat 0-1 hari";
+    case "2-7":
+      return "Last Heartbeat 2-7 hari";
+    case "8-14":
+      return "Last Heartbeat 8-14 hari";
+    case "15-30":
+      return "Last Heartbeat 15-30 hari";
+    case ">30":
+      return "Last Heartbeat > 30 Hari";
+    case "no-data":
+      return "No Data";
+    default:
+      return "Semua";
+  }
 }
 
 function buildExportHtml(
@@ -251,6 +349,111 @@ function buildExportHtml(
           <tbody>${tableRows}</tbody>
         </table>
         <div class="footer">TMS Qualita export document</div>
+      </div>
+    </body>
+  </html>`;
+}
+
+function buildSummaryExportHtml(
+  title: string,
+  subtitle: string,
+  rows: HeartbeatSummaryRow[],
+  grandTotal: number,
+  logoDataUrl?: string | null,
+) {
+  const generatedAt = escapeHtml(formatExportTimestamp());
+  const logoMarkup = logoDataUrl
+    ? `<img src="${logoDataUrl}" alt="Qualita Indonesia" style="width:64px;height:64px;object-fit:contain;display:block;" />`
+    : "";
+
+  const tableRows = rows
+    .map(
+      (row) => `
+        <tr>
+          <td>${escapeHtml(row.label)}</td>
+          <td style="text-align:right;">${row.total}</td>
+        </tr>`,
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+  <html>
+    <head>
+      <meta charset="UTF-8" />
+      <title>${escapeHtml(title)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 0; color: #0f172a; }
+        .sheet { padding: 28px; }
+        .hero {
+          padding: 0 0 18px 0;
+          margin-bottom: 22px;
+          border-bottom: 3px solid #1d4ed8;
+        }
+        .hero-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+        }
+        .brand-wrap {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+        }
+        .title { font-size: 30px; font-weight: 700; margin-top: 6px; color: #111827; }
+        .subtitle { margin-top: 6px; font-size: 14px; color: #4b5563; }
+        .meta { margin-top: 4px; font-size: 12px; color: #6b7280; text-align: right; }
+        table { width: 100%; border-collapse: collapse; }
+        thead th {
+          background: #f9fafb;
+          color: #111827;
+          text-align: left;
+          padding: 12px;
+          font-size: 12px;
+          border: 1px solid #d1d5db;
+          font-weight: 700;
+        }
+        tbody td {
+          padding: 11px 12px;
+          border: 1px solid #e5e7eb;
+          font-size: 12px;
+        }
+        tbody tr:nth-child(even) { background: #fafafa; }
+        .grand-row td {
+          background: #e2e8f0;
+          font-weight: 700;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="sheet">
+        <div class="hero">
+          <div class="hero-top">
+            <div class="brand-wrap">
+              ${logoMarkup}
+              <div>
+                <div class="title">${escapeHtml(title)}</div>
+                <div class="subtitle">${escapeHtml(subtitle)}</div>
+              </div>
+            </div>
+            <div class="meta">Waktu unduh:<br/>${generatedAt}</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Summary</th>
+              <th style="text-align:right;">Jumlah</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="grand-row">
+              <td>Grand Total</td>
+              <td style="text-align:right;">${grandTotal}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </body>
   </html>`;
@@ -400,6 +603,133 @@ async function exportDevicesToPdf(
   doc.save(`tms-qualita-${mode}-report-${sanitizeFileDate()}.pdf`);
 }
 
+async function exportSummaryToPdf(
+  mode: "edc" | "soundbox",
+  rows: HeartbeatSummaryRow[],
+  grandTotal: number,
+  filterLabel: string,
+  logoDataUrl?: string | null,
+) {
+  const jspdfModule = await import("jspdf");
+  const JsPdfCtor = (jspdfModule as { jsPDF: new (options?: unknown) => any }).jsPDF;
+  const doc = new JsPdfCtor({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4",
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 14;
+  const headerTop = 10;
+  const tableStartY = 48;
+  const rowHeight = 10;
+  const colWidths = [130, 42];
+  const title = mode === "soundbox"
+    ? "TMS Qualita Summary Heartbeat Soundbox"
+    : "TMS Qualita Summary Heartbeat Device";
+  const subtitle = `Ringkasan heartbeat (filter: ${filterLabel})`;
+  const generatedAt = formatExportTimestamp();
+
+  const drawHeader = () => {
+    doc.setDrawColor(29, 78, 216);
+    doc.setLineWidth(0.8);
+    doc.line(marginX, headerTop + 22, pageWidth - marginX, headerTop + 22);
+
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", marginX, headerTop, 14, 14);
+    }
+
+    doc.setTextColor(17, 24, 39);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.text(title, marginX + (logoDataUrl ? 18 : 0), headerTop + 8);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(75, 85, 99);
+    doc.text(subtitle, marginX + (logoDataUrl ? 18 : 0), headerTop + 15);
+
+    doc.setTextColor(107, 114, 128);
+    doc.setFontSize(8.5);
+    doc.text(`Waktu unduh: ${generatedAt}`, pageWidth - marginX, headerTop + 6, { align: "right" });
+  };
+
+  const drawTableHeader = (y: number) => {
+    let x = marginX;
+    doc.setDrawColor(209, 213, 219);
+    doc.setTextColor(17, 24, 39);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+
+    ["Summary", "Jumlah"].forEach((column, index) => {
+      const width = colWidths[index];
+      doc.setFillColor(249, 250, 251);
+      doc.rect(x, y, width, rowHeight, "FD");
+      doc.text(column, index === 1 ? x + width - 4 : x + 2, y + 6.2, {
+        align: index === 1 ? "right" : "left",
+      });
+      x += width;
+    });
+  };
+
+  const drawRow = (label: string, total: number, y: number, even: boolean, bold = false) => {
+    let x = marginX;
+    doc.setDrawColor(229, 231, 235);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(9);
+
+    const values = [label, String(total)];
+    values.forEach((value, index) => {
+      const width = colWidths[index];
+      if (bold) {
+        doc.setFillColor(226, 232, 240);
+        doc.rect(x, y, width, rowHeight, "FD");
+      } else if (even) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(x, y, width, rowHeight, "FD");
+      } else {
+        doc.rect(x, y, width, rowHeight, "S");
+      }
+
+      doc.text(value, index === 1 ? x + width - 4 : x + 2, y + 6.2, {
+        align: index === 1 ? "right" : "left",
+      });
+      x += width;
+    });
+  };
+
+  drawHeader();
+  let y = tableStartY;
+  drawTableHeader(y);
+  y += rowHeight;
+
+  rows.forEach((row, index) => {
+    if (y + rowHeight > pageHeight - 14) {
+      doc.addPage();
+      drawHeader();
+      y = tableStartY;
+      drawTableHeader(y);
+      y += rowHeight;
+    }
+
+    drawRow(row.label, row.total, y, index % 2 === 1);
+    y += rowHeight;
+  });
+
+  if (y + rowHeight > pageHeight - 14) {
+    doc.addPage();
+    drawHeader();
+    y = tableStartY;
+    drawTableHeader(y);
+    y += rowHeight;
+  }
+
+  drawRow("Grand Total", grandTotal, y, false, true);
+  doc.save(`tms-qualita-${mode}-summary-${sanitizeFileDate()}.pdf`);
+}
+
 function getFreshnessBadge(value?: string | null) {
   if (!value) {
     return (
@@ -466,7 +796,10 @@ export default function DeviceTable({
   basePath?: string;
 }) {
   type GroupByOption = "none" | "merchant" | "model" | "deviceType" | "heartbeat";
-  type HeartbeatFilterOption = "all" | "live" | "stale" | "offline" | "no-data";
+  type HeartbeatFilterOption = "all" | "0-1" | "2-7" | "8-14" | "15-30" | ">30" | "no-data";
+  type ViewTabOption = "table" | "summary";
+  type ExportTargetOption = "device" | "summary";
+  type ExportFormatOption = "excel" | "pdf";
 
   const [devices, setDevices] = useState<Device[]>([]);
   const [open, setOpen] = useState(false);
@@ -479,9 +812,14 @@ export default function DeviceTable({
   const [page, setPage] = useState(1);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState<ExportTargetOption>("device");
+  const [exportFormat, setExportFormat] = useState<ExportFormatOption>("excel");
+  const [exportHeartbeatFilter, setExportHeartbeatFilter] = useState<HeartbeatFilterOption>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<GroupByOption>("none");
   const [heartbeatFilter, setHeartbeatFilter] = useState<HeartbeatFilterOption>("all");
+  const [viewTab, setViewTab] = useState<ViewTabOption>("table");
   const router = useRouter();
 
   useEffect(() => {
@@ -581,15 +919,7 @@ export default function DeviceTable({
   }, [searchQuery, groupBy, heartbeatFilter]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
-  const filteredDevices = devices.filter((device) => {
-    const heartbeatLabel = getHeartbeatLabel(device.lastSeenAt).toLowerCase();
-    const matchesHeartbeat = heartbeatFilter === "all"
-      ? true
-      : heartbeatFilter === "no-data"
-        ? heartbeatLabel === "no data"
-        : heartbeatLabel === heartbeatFilter;
-
-    if (!matchesHeartbeat) return false;
+  const searchFilteredDevices = devices.filter((device) => {
     if (!normalizedSearch) return true;
 
     const searchable = [
@@ -607,6 +937,19 @@ export default function DeviceTable({
 
     return searchable.includes(normalizedSearch);
   });
+
+  const filteredDevices = searchFilteredDevices.filter((device) => {
+    if (heartbeatFilter === "all") return true;
+    return getHeartbeatRangeFilterKey(device.lastSeenAt) === heartbeatFilter;
+  });
+
+  const heartbeatSummaryRows = getHeartbeatSummaryRows(searchFilteredDevices);
+
+  const exportScopedDevices = exportHeartbeatFilter === "all"
+    ? searchFilteredDevices
+    : searchFilteredDevices.filter(
+      (device) => getHeartbeatRangeFilterKey(device.lastSeenAt) === exportHeartbeatFilter,
+    );
 
   const getGroupLabel = (device: Device): string => {
     switch (groupBy) {
@@ -638,44 +981,87 @@ export default function DeviceTable({
   const startIndex = (currentPage - 1) * PAGE_SIZE;
   const paginatedDevices = orderedDevices.slice(startIndex, startIndex + PAGE_SIZE);
 
-  const handleExportExcel = async () => {
-    try {
-      setExportingExcel(true);
-      const title = mode === "soundbox" ? "TMS Qualita Soundbox Report" : "TMS Qualita Device Report";
-      const subtitle = mode === "soundbox"
-        ? "Export daftar soundbox dan heartbeat terakhir"
-        : "Export daftar device EDC dan heartbeat terakhir";
-      const logoDataUrl = await loadPublicImageAsDataUrl("/qualita_indonesia_logo.png");
-      const html = buildExportHtml(title, subtitle, getDeviceExportRows(orderedDevices), logoDataUrl);
-      const blob = new Blob([html], {
-        type: "application/vnd.ms-excel;charset=utf-8;",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `tms-qualita-${mode}-report-${sanitizeFileDate()}.xls`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Error exporting Excel:", error);
-      alert("Gagal export Excel");
-    } finally {
-      setExportingExcel(false);
-    }
+  const downloadExcelFile = (html: string, filename: string) => {
+    const blob = new Blob([html], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const handleExportPdf = async () => {
+  const handleOpenExportModal = () => {
+    setExportHeartbeatFilter(heartbeatFilter);
+    setExportOpen(true);
+  };
+
+  const handleRunExport = async () => {
     try {
-      setExportingPdf(true);
+      if (exportFormat === "excel") {
+        setExportingExcel(true);
+      } else {
+        setExportingPdf(true);
+      }
+
+      const filterLabel = getHeartbeatFilterDisplayLabel(exportHeartbeatFilter);
       const logoDataUrl = await loadPublicImageAsDataUrl("/qualita_indonesia_logo.png");
-      await exportDevicesToPdf(mode, orderedDevices, logoDataUrl);
+
+      if (exportTarget === "device") {
+        const title = mode === "soundbox" ? "TMS Qualita Soundbox Report" : "TMS Qualita Device Report";
+        const subtitle = mode === "soundbox"
+          ? `Export daftar soundbox dan heartbeat terakhir (filter: ${filterLabel})`
+          : `Export daftar device EDC dan heartbeat terakhir (filter: ${filterLabel})`;
+
+        if (exportFormat === "excel") {
+          const html = buildExportHtml(
+            title,
+            subtitle,
+            getDeviceExportRows(exportScopedDevices),
+            logoDataUrl,
+          );
+          downloadExcelFile(html, `tms-qualita-${mode}-report-${sanitizeFileDate()}.xls`);
+        } else {
+          await exportDevicesToPdf(mode, exportScopedDevices, logoDataUrl);
+        }
+      } else {
+        const summaryRows = getHeartbeatSummaryRows(exportScopedDevices);
+        const title = mode === "soundbox"
+          ? "TMS Qualita Summary Heartbeat Soundbox"
+          : "TMS Qualita Summary Heartbeat Device";
+        const subtitle = `Ringkasan heartbeat (filter: ${filterLabel})`;
+
+        if (exportFormat === "excel") {
+          const html = buildSummaryExportHtml(
+            title,
+            subtitle,
+            summaryRows,
+            exportScopedDevices.length,
+            logoDataUrl,
+          );
+          downloadExcelFile(html, `tms-qualita-${mode}-summary-${sanitizeFileDate()}.xls`);
+        } else {
+          await exportSummaryToPdf(
+            mode,
+            summaryRows,
+            exportScopedDevices.length,
+            filterLabel,
+            logoDataUrl,
+          );
+        }
+      }
+
+      setExportOpen(false);
     } catch (error) {
-      console.error("Error exporting PDF:", error);
-      alert("Gagal export PDF");
+      console.error("Error exporting:", error);
+      alert("Gagal export data");
     } finally {
       setExportingPdf(false);
+      setExportingExcel(false);
     }
   };
 
@@ -691,21 +1077,12 @@ export default function DeviceTable({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            onClick={handleExportExcel}
-            disabled={loading || devices.length === 0 || exportingExcel}
-            className="border-green-200 text-green-700 hover:bg-green-50"
+            onClick={handleOpenExportModal}
+            disabled={loading || devices.length === 0 || exportingExcel || exportingPdf}
+            className="border-sky-200 text-sky-700 hover:bg-sky-50"
           >
-            <Icon icon="mdi:microsoft-excel" className="mr-1 h-4 w-4" />
-            {exportingExcel ? "Exporting..." : "Export Excel"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            disabled={loading || devices.length === 0 || exportingPdf}
-            className="border-red-200 text-red-700 hover:bg-red-50"
-          >
-            <Icon icon="mdi:file-pdf-box" className="mr-1 h-4 w-4" />
-            {exportingPdf ? "Exporting..." : "Export PDF"}
+            <Icon icon="mdi:download-box" className="mr-1 h-4 w-4" />
+            {exportingExcel || exportingPdf ? "Exporting..." : "Export"}
           </Button>
           <Link href={`${basePath}/map`}>
             <Button variant="outline">
@@ -720,6 +1097,31 @@ export default function DeviceTable({
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="mb-4 inline-flex rounded-md border border-gray-200 bg-white p-1">
+        <button
+          type="button"
+          onClick={() => setViewTab("table")}
+          className={`rounded px-3 py-1.5 text-sm font-medium transition ${
+            viewTab === "table"
+              ? "bg-sky-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Tabel Device
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewTab("summary")}
+          className={`rounded px-3 py-1.5 text-sm font-medium transition ${
+            viewTab === "summary"
+              ? "bg-sky-600 text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Summary Heartbeat
+        </button>
       </div>
 
       <div className="mb-4 grid gap-3 md:grid-cols-3">
@@ -748,9 +1150,11 @@ export default function DeviceTable({
             className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
           >
             <option value="all">Semua</option>
-            <option value="live">LIVE</option>
-            <option value="stale">STALE</option>
-            <option value="offline">OFFLINE</option>
+            <option value="0-1">Heartbeat 0-1 hari</option>
+            <option value="2-7">Last Heartbeat 2-7 hari</option>
+            <option value="8-14">Last Heartbeat 8-14 hari</option>
+            <option value="15-30">Last Heartbeat 15-30 hari</option>
+            <option value=">30">Last Heartbeat {">"} 30 Hari</option>
             <option value="no-data">NO DATA</option>
           </select>
         </label>
@@ -776,6 +1180,39 @@ export default function DeviceTable({
       {loading ? (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           Loading devices...
+        </div>
+      ) : viewTab === "summary" ? (
+        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="p-3 text-left font-semibold text-gray-900">Summary</th>
+                <th className="p-3 text-right font-semibold text-gray-900">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              {heartbeatSummaryRows.length === 0 ? (
+                <tr>
+                  <td colSpan={2} className="p-6 text-center text-gray-500">
+                    Tidak ada data untuk summary.
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {heartbeatSummaryRows.map((row) => (
+                    <tr key={row.label} className="border-b border-gray-100">
+                      <td className="p-3 text-gray-900">{row.label}</td>
+                      <td className="p-3 text-right font-medium text-gray-900">{row.total}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-100 font-bold">
+                    <td className="p-3 text-gray-900">Grand Total</td>
+                    <td className="p-3 text-right text-gray-900">{searchFilteredDevices.length}</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
       ) : (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-slate-900">
@@ -904,7 +1341,7 @@ export default function DeviceTable({
         </div>
       )}
 
-      {!loading && devices.length > 0 && (
+      {!loading && viewTab === "table" && devices.length > 0 && (
         <div className="mt-4 flex items-center justify-between gap-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Menampilkan {orderedDevices.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, orderedDevices.length)} dari {orderedDevices.length} data
@@ -943,6 +1380,93 @@ export default function DeviceTable({
           setDetailDevice(null);
         }}
       />
+
+      {exportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Export Data</h3>
+                <p className="mt-1 text-sm text-gray-500">Pilih format, filter heartbeat, dan jenis export.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExportOpen(false)}
+                aria-label="Tutup modal export"
+                title="Tutup"
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <Icon icon="mdi:close" className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Export</span>
+                <select
+                  value={exportTarget}
+                  onChange={(event) => setExportTarget(event.target.value as ExportTargetOption)}
+                  className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
+                >
+                  <option value="device">Device</option>
+                  <option value="summary">Summary Heartbeat</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Format</span>
+                <select
+                  value={exportFormat}
+                  onChange={(event) => setExportFormat(event.target.value as ExportFormatOption)}
+                  className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
+                >
+                  <option value="excel">Excel</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Filter Heartbeat</span>
+                <select
+                  value={exportHeartbeatFilter}
+                  onChange={(event) =>
+                    setExportHeartbeatFilter(event.target.value as HeartbeatFilterOption)}
+                  className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
+                >
+                  <option value="all">Semua</option>
+                  <option value="0-1">Heartbeat 0-1 hari</option>
+                  <option value="2-7">Last Heartbeat 2-7 hari</option>
+                  <option value="8-14">Last Heartbeat 8-14 hari</option>
+                  <option value="15-30">Last Heartbeat 15-30 hari</option>
+                  <option value=">30">Last Heartbeat {">"} 30 Hari</option>
+                  <option value="no-data">NO DATA</option>
+                </select>
+              </label>
+
+              <p className="text-xs text-gray-500">
+                Data siap di-export: <span className="font-semibold text-gray-700">{exportScopedDevices.length}</span>
+              </p>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setExportOpen(false)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handleRunExport}
+                disabled={exportingExcel || exportingPdf}
+              >
+                {exportingExcel || exportingPdf ? "Exporting..." : "Export Sekarang"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <DeviceDialog
         open={open}
