@@ -453,7 +453,9 @@ export default function MqttConfigPanel() {
 
           <button
             className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => sendCommand("UPDATE_MQTT_HOST", { host: config.host })}
+            onClick={() =>
+              sendCommand("UPDATE_MQTT_HOST", { host: config.host })
+            }
             disabled={sendingCmd}
           >
             <div className="text-sm font-semibold text-amber-900">
@@ -535,7 +537,9 @@ export default function MqttConfigPanel() {
           </label>
 
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-violet-700">OTA App Name</span>
+            <span className="mb-1 block text-xs text-violet-700">
+              OTA App Name
+            </span>
             <input
               className="w-full rounded border border-violet-200 bg-white px-2 py-1"
               placeholder="Qualita Agent"
@@ -545,7 +549,9 @@ export default function MqttConfigPanel() {
           </label>
 
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-violet-700">OTA Version</span>
+            <span className="mb-1 block text-xs text-violet-700">
+              OTA Version
+            </span>
             <input
               className="w-full rounded border border-violet-200 bg-white px-2 py-1"
               placeholder="contoh: 1.2.0"
@@ -555,7 +561,9 @@ export default function MqttConfigPanel() {
           </label>
 
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-violet-700">Package Name (optional)</span>
+            <span className="mb-1 block text-xs text-violet-700">
+              Package Name (optional)
+            </span>
             <input
               className="w-full rounded border border-violet-200 bg-white px-2 py-1"
               placeholder="com.qualitaindonesia.qualitatms"
@@ -565,7 +573,9 @@ export default function MqttConfigPanel() {
           </label>
 
           <label className="text-sm">
-            <span className="mb-1 block text-xs text-violet-700">Download URL (optional)</span>
+            <span className="mb-1 block text-xs text-violet-700">
+              Download URL (optional)
+            </span>
             <input
               className="w-full rounded border border-violet-200 bg-white px-2 py-1"
               placeholder="https://.../apk/id/download?sn=..."

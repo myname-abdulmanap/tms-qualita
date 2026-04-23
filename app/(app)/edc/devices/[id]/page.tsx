@@ -927,7 +927,6 @@ export default function EdcDeviceDetailPage() {
             </div>
           </div>
         </TabsContent>
-
       </Tabs>
     </div>
   );

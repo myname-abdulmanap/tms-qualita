@@ -68,7 +68,8 @@ async function loadPublicImageAsDataUrl(path: string): Promise<string | null> {
     const blob = await res.blob();
     return await new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onloadend = () =>
+        resolve(typeof reader.result === "string" ? reader.result : null);
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
@@ -129,7 +130,7 @@ function getHeartbeatDescription(value?: string | null): string {
     return `Offline ${duration}`;
   }
 
-  return `Online ${duration}`;
+  return "Sedang Online";
 }
 
 function getHeartbeatRangeFilterKey(
@@ -163,14 +164,11 @@ function getHeartbeatSummaryLabel(value?: string | null): string {
     case ">30":
       return "Last Heartbeat > 30 Hari";
     case "0-1": {
-      const date = value ? new Date(value) : null;
-      const dateLabel = date && !Number.isNaN(date.getTime())
-        ? date.toLocaleDateString("id-ID", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
-        : "tidak valid";
+      const dateLabel = new Date().toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
       return `Heartbeat ${dateLabel}`;
     }
     default:
@@ -186,8 +184,7 @@ function getDeviceExportRows(devices: Device[]) {
     serialNumber: device.serialNumber || "-",
     model: device.model || "-",
     merchant: device.merchant?.name || "-",
-    heartbeatStatus: getHeartbeatLabel(device.lastSeenAt),
-    heartbeatAt: formatDeviceTime(device.lastSeenAt),
+    heartbeat: formatDeviceTime(device.lastSeenAt),
     heartbeatDescription: getHeartbeatDescription(device.lastSeenAt),
   }));
 }
@@ -198,31 +195,32 @@ type HeartbeatSummaryRow = {
 };
 
 function getHeartbeatSummaryRows(devices: Device[]): HeartbeatSummaryRow[] {
-  const summaryMap = new Map<string, number>();
+  const todayLabel = `Heartbeat ${new Date().toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })}`;
+
+  const orderedLabels = [
+    "Last Heartbeat 15-30 hari",
+    "Last Heartbeat 8-14 hari",
+    "Last Heartbeat > 30 Hari",
+    "Last Heartbeat 2-7 hari",
+    todayLabel,
+    "Belum ada heartbeat",
+  ];
+
+  const summaryMap = new Map<string, number>(orderedLabels.map((label) => [label, 0]));
 
   for (const device of devices) {
     const label = getHeartbeatSummaryLabel(device.lastSeenAt);
     summaryMap.set(label, (summaryMap.get(label) ?? 0) + 1);
   }
 
-  const priority = (label: string) => {
-    if (label === "Last Heartbeat 2-7 hari") return 1;
-    if (label === "Last Heartbeat 8-14 hari") return 2;
-    if (label === "Last Heartbeat 15-30 hari") return 3;
-    if (label === "Last Heartbeat > 30 Hari") return 4;
-    if (label.startsWith("Heartbeat ")) return 5;
-    if (label === "Belum ada heartbeat") return 6;
-    return 7;
-  };
-
-  return Array.from(summaryMap.entries())
-    .map(([label, total]) => ({ label, total }))
-    .sort((a, b) => {
-      const pa = priority(a.label);
-      const pb = priority(b.label);
-      if (pa !== pb) return pa - pb;
-      return a.label.localeCompare(b.label);
-    });
+  return orderedLabels.map((label) => ({
+    label,
+    total: summaryMap.get(label) ?? 0,
+  }));
 }
 
 function getHeartbeatFilterDisplayLabel(filter: string): string {
@@ -264,8 +262,7 @@ function buildExportHtml(
           <td>${escapeHtml(row.serialNumber)}</td>
           <td>${escapeHtml(row.model)}</td>
           <td>${escapeHtml(row.merchant)}</td>
-          <td>${escapeHtml(row.heartbeatStatus)}</td>
-          <td>${escapeHtml(row.heartbeatAt)}</td>
+          <td>${escapeHtml(row.heartbeat)}</td>
           <td>${escapeHtml(row.heartbeatDescription)}</td>
         </tr>`,
     )
@@ -342,7 +339,6 @@ function buildExportHtml(
               <th>Model</th>
               <th>Merchant</th>
               <th>Heartbeat</th>
-              <th>Last Update</th>
               <th>Keterangan</th>
             </tr>
           </thead>
@@ -465,7 +461,8 @@ async function exportDevicesToPdf(
   logoDataUrl?: string | null,
 ) {
   const jspdfModule = await import("jspdf");
-  const JsPdfCtor = (jspdfModule as { jsPDF: new (options?: unknown) => any }).jsPDF;
+  const JsPdfCtor = (jspdfModule as { jsPDF: new (options?: unknown) => any })
+    .jsPDF;
   const doc = new JsPdfCtor({
     orientation: "landscape",
     unit: "mm",
@@ -479,7 +476,7 @@ async function exportDevicesToPdf(
   const headerTop = 10;
   const tableStartY = 46;
   const rowHeight = 11;
-  const colWidths = [10, 26, 18, 43, 24, 28, 20, 34, 34];
+  const colWidths = [10, 29, 19, 45, 25, 29, 32, 44];
   const columns = [
     "No",
     "Device Code",
@@ -488,18 +485,23 @@ async function exportDevicesToPdf(
     "Model",
     "Merchant",
     "Heartbeat",
-    "Last Update",
     "Keterangan",
   ];
-  const title = mode === "soundbox" ? "Qualita Soundbox Report" : "TMS Qualita Device Report";
-  const subtitle = mode === "soundbox"
-    ? "Export daftar soundbox dan heartbeat terakhir"
-    : "Export daftar device EDC dan heartbeat terakhir";
+  const title =
+    mode === "soundbox"
+      ? "Qualita Soundbox Report"
+      : "TMS Qualita Device Report";
+  const subtitle =
+    mode === "soundbox"
+      ? "Export daftar soundbox dan heartbeat terakhir"
+      : "Export daftar device EDC dan heartbeat terakhir";
   const generatedAt = formatExportTimestamp();
 
   const drawCellText = (value: string, x: number, y: number, width: number) => {
     const lines = doc.splitTextToSize(String(value || "-"), width - 4);
-    const firstLine = Array.isArray(lines) ? String(lines[0] || "-") : String(lines || "-");
+    const firstLine = Array.isArray(lines)
+      ? String(lines[0] || "-")
+      : String(lines || "-");
     doc.text(firstLine, x + 2, y + 6.8, { baseline: "middle" });
   };
 
@@ -524,7 +526,12 @@ async function exportDevicesToPdf(
 
     doc.setTextColor(107, 114, 128);
     doc.setFontSize(8.5);
-    doc.text(`Waktu unduh: ${generatedAt}`, pageWidth - marginX, headerTop + 6, { align: "right" });
+    doc.text(
+      `Waktu unduh: ${generatedAt}`,
+      pageWidth - marginX,
+      headerTop + 6,
+      { align: "right" },
+    );
   };
 
   const drawTableHeader = (y: number) => {
@@ -547,7 +554,11 @@ async function exportDevicesToPdf(
     });
   };
 
-  const drawRow = (row: ReturnType<typeof getDeviceExportRows>[number], y: number, even: boolean) => {
+  const drawRow = (
+    row: ReturnType<typeof getDeviceExportRows>[number],
+    y: number,
+    even: boolean,
+  ) => {
     let x = marginX;
     doc.setDrawColor(229, 231, 235);
     doc.setTextColor(15, 23, 42);
@@ -561,8 +572,7 @@ async function exportDevicesToPdf(
       row.serialNumber,
       row.model,
       row.merchant,
-      row.heartbeatStatus,
-      row.heartbeatAt,
+      row.heartbeat,
       row.heartbeatDescription,
     ];
 
@@ -611,7 +621,8 @@ async function exportSummaryToPdf(
   logoDataUrl?: string | null,
 ) {
   const jspdfModule = await import("jspdf");
-  const JsPdfCtor = (jspdfModule as { jsPDF: new (options?: unknown) => any }).jsPDF;
+  const JsPdfCtor = (jspdfModule as { jsPDF: new (options?: unknown) => any })
+    .jsPDF;
   const doc = new JsPdfCtor({
     orientation: "portrait",
     unit: "mm",
@@ -625,9 +636,10 @@ async function exportSummaryToPdf(
   const tableStartY = 48;
   const rowHeight = 10;
   const colWidths = [130, 42];
-  const title = mode === "soundbox"
-    ? "TMS Qualita Summary Heartbeat Soundbox"
-    : "TMS Qualita Summary Heartbeat Device";
+  const title =
+    mode === "soundbox"
+      ? "TMS Qualita Summary Heartbeat Soundbox"
+      : "TMS Qualita Summary Heartbeat Device";
   const subtitle = `Ringkasan heartbeat (filter: ${filterLabel})`;
   const generatedAt = formatExportTimestamp();
 
@@ -652,7 +664,12 @@ async function exportSummaryToPdf(
 
     doc.setTextColor(107, 114, 128);
     doc.setFontSize(8.5);
-    doc.text(`Waktu unduh: ${generatedAt}`, pageWidth - marginX, headerTop + 6, { align: "right" });
+    doc.text(
+      `Waktu unduh: ${generatedAt}`,
+      pageWidth - marginX,
+      headerTop + 6,
+      { align: "right" },
+    );
   };
 
   const drawTableHeader = (y: number) => {
@@ -673,7 +690,13 @@ async function exportSummaryToPdf(
     });
   };
 
-  const drawRow = (label: string, total: number, y: number, even: boolean, bold = false) => {
+  const drawRow = (
+    label: string,
+    total: number,
+    y: number,
+    even: boolean,
+    bold = false,
+  ) => {
     let x = marginX;
     doc.setDrawColor(229, 231, 235);
     doc.setFont("helvetica", bold ? "bold" : "normal");
@@ -795,8 +818,20 @@ export default function DeviceTable({
   mode?: "edc" | "soundbox";
   basePath?: string;
 }) {
-  type GroupByOption = "none" | "merchant" | "model" | "deviceType" | "heartbeat";
-  type HeartbeatFilterOption = "all" | "0-1" | "2-7" | "8-14" | "15-30" | ">30" | "no-data";
+  type GroupByOption =
+    | "none"
+    | "merchant"
+    | "model"
+    | "deviceType"
+    | "heartbeat";
+  type HeartbeatFilterOption =
+    | "all"
+    | "0-1"
+    | "2-7"
+    | "8-14"
+    | "15-30"
+    | ">30"
+    | "no-data";
   type ViewTabOption = "table" | "summary";
   type ExportTargetOption = "device" | "summary";
   type ExportFormatOption = "excel" | "pdf";
@@ -813,12 +848,15 @@ export default function DeviceTable({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportTarget, setExportTarget] = useState<ExportTargetOption>("device");
+  const [exportTarget, setExportTarget] =
+    useState<ExportTargetOption>("device");
   const [exportFormat, setExportFormat] = useState<ExportFormatOption>("excel");
-  const [exportHeartbeatFilter, setExportHeartbeatFilter] = useState<HeartbeatFilterOption>("all");
+  const [exportHeartbeatFilter, setExportHeartbeatFilter] =
+    useState<HeartbeatFilterOption>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<GroupByOption>("none");
-  const [heartbeatFilter, setHeartbeatFilter] = useState<HeartbeatFilterOption>("all");
+  const [heartbeatFilter, setHeartbeatFilter] =
+    useState<HeartbeatFilterOption>("all");
   const [viewTab, setViewTab] = useState<ViewTabOption>("table");
   const router = useRouter();
 
@@ -945,11 +983,14 @@ export default function DeviceTable({
 
   const heartbeatSummaryRows = getHeartbeatSummaryRows(searchFilteredDevices);
 
-  const exportScopedDevices = exportHeartbeatFilter === "all"
-    ? searchFilteredDevices
-    : searchFilteredDevices.filter(
-      (device) => getHeartbeatRangeFilterKey(device.lastSeenAt) === exportHeartbeatFilter,
-    );
+  const exportScopedDevices =
+    exportHeartbeatFilter === "all"
+      ? searchFilteredDevices
+      : searchFilteredDevices.filter(
+          (device) =>
+            getHeartbeatRangeFilterKey(device.lastSeenAt) ===
+            exportHeartbeatFilter,
+        );
 
   const getGroupLabel = (device: Device): string => {
     switch (groupBy) {
@@ -971,7 +1012,9 @@ export default function DeviceTable({
       return (left.deviceCode || "").localeCompare(right.deviceCode || "");
     }
 
-    const groupCompare = getGroupLabel(left).localeCompare(getGroupLabel(right));
+    const groupCompare = getGroupLabel(left).localeCompare(
+      getGroupLabel(right),
+    );
     if (groupCompare !== 0) return groupCompare;
     return (left.deviceCode || "").localeCompare(right.deviceCode || "");
   });
@@ -979,7 +1022,10 @@ export default function DeviceTable({
   const totalPages = Math.max(1, Math.ceil(orderedDevices.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const startIndex = (currentPage - 1) * PAGE_SIZE;
-  const paginatedDevices = orderedDevices.slice(startIndex, startIndex + PAGE_SIZE);
+  const paginatedDevices = orderedDevices.slice(
+    startIndex,
+    startIndex + PAGE_SIZE,
+  );
 
   const downloadExcelFile = (html: string, filename: string) => {
     const blob = new Blob([html], {
@@ -1009,13 +1055,19 @@ export default function DeviceTable({
       }
 
       const filterLabel = getHeartbeatFilterDisplayLabel(exportHeartbeatFilter);
-      const logoDataUrl = await loadPublicImageAsDataUrl("/qualita_indonesia_logo.png");
+      const logoDataUrl = await loadPublicImageAsDataUrl(
+        "/qualita_indonesia_logo.png",
+      );
 
       if (exportTarget === "device") {
-        const title = mode === "soundbox" ? "TMS Qualita Soundbox Report" : "TMS Qualita Device Report";
-        const subtitle = mode === "soundbox"
-          ? `Export daftar soundbox dan heartbeat terakhir (filter: ${filterLabel})`
-          : `Export daftar device EDC dan heartbeat terakhir (filter: ${filterLabel})`;
+        const title =
+          mode === "soundbox"
+            ? "TMS Qualita Soundbox Report"
+            : "TMS Qualita Device Report";
+        const subtitle =
+          mode === "soundbox"
+            ? `Export daftar soundbox dan heartbeat terakhir (filter: ${filterLabel})`
+            : `Export daftar device EDC dan heartbeat terakhir (filter: ${filterLabel})`;
 
         if (exportFormat === "excel") {
           const html = buildExportHtml(
@@ -1024,15 +1076,19 @@ export default function DeviceTable({
             getDeviceExportRows(exportScopedDevices),
             logoDataUrl,
           );
-          downloadExcelFile(html, `tms-qualita-${mode}-report-${sanitizeFileDate()}.xls`);
+          downloadExcelFile(
+            html,
+            `tms-qualita-${mode}-report-${sanitizeFileDate()}.xls`,
+          );
         } else {
           await exportDevicesToPdf(mode, exportScopedDevices, logoDataUrl);
         }
       } else {
         const summaryRows = getHeartbeatSummaryRows(exportScopedDevices);
-        const title = mode === "soundbox"
-          ? "TMS Qualita Summary Heartbeat Soundbox"
-          : "TMS Qualita Summary Heartbeat Device";
+        const title =
+          mode === "soundbox"
+            ? "TMS Qualita Summary Heartbeat Soundbox"
+            : "TMS Qualita Summary Heartbeat Device";
         const subtitle = `Ringkasan heartbeat (filter: ${filterLabel})`;
 
         if (exportFormat === "excel") {
@@ -1043,7 +1099,10 @@ export default function DeviceTable({
             exportScopedDevices.length,
             logoDataUrl,
           );
-          downloadExcelFile(html, `tms-qualita-${mode}-summary-${sanitizeFileDate()}.xls`);
+          downloadExcelFile(
+            html,
+            `tms-qualita-${mode}-summary-${sanitizeFileDate()}.xls`,
+          );
         } else {
           await exportSummaryToPdf(
             mode,
@@ -1070,7 +1129,8 @@ export default function DeviceTable({
       <div className="mb-4 flex justify-between items-center">
         <div>
           <p className="text-sm text-gray-500">
-            {orderedDevices.length} {mode === "soundbox" ? "soundbox" : "device"}
+            {orderedDevices.length}{" "}
+            {mode === "soundbox" ? "soundbox" : "device"}
             {orderedDevices.length !== 1 ? "s" : ""} total
           </p>
         </div>
@@ -1078,7 +1138,9 @@ export default function DeviceTable({
           <Button
             variant="outline"
             onClick={handleOpenExportModal}
-            disabled={loading || devices.length === 0 || exportingExcel || exportingPdf}
+            disabled={
+              loading || devices.length === 0 || exportingExcel || exportingPdf
+            }
             className="border-sky-200 text-sky-700 hover:bg-sky-50"
           >
             <Icon icon="mdi:download-box" className="mr-1 h-4 w-4" />
@@ -1130,7 +1192,10 @@ export default function DeviceTable({
             Search
           </span>
           <div className="relative">
-            <Icon icon="mdi:magnify" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Icon
+              icon="mdi:magnify"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            />
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -1146,7 +1211,9 @@ export default function DeviceTable({
           </span>
           <select
             value={heartbeatFilter}
-            onChange={(event) => setHeartbeatFilter(event.target.value as HeartbeatFilterOption)}
+            onChange={(event) =>
+              setHeartbeatFilter(event.target.value as HeartbeatFilterOption)
+            }
             className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
           >
             <option value="all">Semua</option>
@@ -1165,7 +1232,9 @@ export default function DeviceTable({
           </span>
           <select
             value={groupBy}
-            onChange={(event) => setGroupBy(event.target.value as GroupByOption)}
+            onChange={(event) =>
+              setGroupBy(event.target.value as GroupByOption)
+            }
             className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
           >
             <option value="none">Tanpa Grouping</option>
@@ -1186,8 +1255,12 @@ export default function DeviceTable({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="p-3 text-left font-semibold text-gray-900">Summary</th>
-                <th className="p-3 text-right font-semibold text-gray-900">Jumlah</th>
+                <th className="p-3 text-left font-semibold text-gray-900">
+                  Summary
+                </th>
+                <th className="p-3 text-right font-semibold text-gray-900">
+                  Jumlah
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1202,12 +1275,16 @@ export default function DeviceTable({
                   {heartbeatSummaryRows.map((row) => (
                     <tr key={row.label} className="border-b border-gray-100">
                       <td className="p-3 text-gray-900">{row.label}</td>
-                      <td className="p-3 text-right font-medium text-gray-900">{row.total}</td>
+                      <td className="p-3 text-right font-medium text-gray-900">
+                        {row.total}
+                      </td>
                     </tr>
                   ))}
                   <tr className="bg-slate-100 font-bold">
                     <td className="p-3 text-gray-900">Grand Total</td>
-                    <td className="p-3 text-right text-gray-900">{searchFilteredDevices.length}</td>
+                    <td className="p-3 text-right text-gray-900">
+                      {searchFilteredDevices.length}
+                    </td>
                   </tr>
                 </>
               )}
@@ -1254,24 +1331,29 @@ export default function DeviceTable({
                 </tr>
               ) : (
                 paginatedDevices.map((device, index) => {
-                  const currentGroup = groupBy === "none" ? "" : getGroupLabel(device);
+                  const currentGroup =
+                    groupBy === "none" ? "" : getGroupLabel(device);
                   const previousDevice = paginatedDevices[index - 1];
                   const previousGroup =
-                    groupBy === "none" || !previousDevice ? "" : getGroupLabel(previousDevice);
-                  const showGroupHeader = groupBy !== "none" && currentGroup !== previousGroup;
+                    groupBy === "none" || !previousDevice
+                      ? ""
+                      : getGroupLabel(previousDevice);
+                  const showGroupHeader =
+                    groupBy !== "none" && currentGroup !== previousGroup;
 
                   return (
                     <Fragment key={`row-${device.id}-${index}`}>
                       {showGroupHeader && (
                         <tr className="border-b border-gray-200 bg-sky-50/70">
-                          <td colSpan={7} className="px-3 py-2 text-sm font-semibold text-sky-800">
+                          <td
+                            colSpan={7}
+                            className="px-3 py-2 text-sm font-semibold text-sky-800"
+                          >
                             {currentGroup}
                           </td>
                         </tr>
                       )}
-                      <tr
-                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
-                      >
+                      <tr className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
                         <td className="p-3 font-medium text-gray-900 dark:text-gray-100">
                           <div className="flex flex-col gap-1">
                             <span>{device.deviceCode}</span>
@@ -1344,7 +1426,9 @@ export default function DeviceTable({
       {!loading && viewTab === "table" && devices.length > 0 && (
         <div className="mt-4 flex items-center justify-between gap-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Menampilkan {orderedDevices.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, orderedDevices.length)} dari {orderedDevices.length} data
+            Menampilkan {orderedDevices.length === 0 ? 0 : startIndex + 1}-
+            {Math.min(startIndex + PAGE_SIZE, orderedDevices.length)} dari{" "}
+            {orderedDevices.length} data
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -1386,8 +1470,12 @@ export default function DeviceTable({
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Export Data</h3>
-                <p className="mt-1 text-sm text-gray-500">Pilih format, filter heartbeat, dan jenis export.</p>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Export Data
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Pilih format, filter heartbeat, dan jenis export.
+                </p>
               </div>
               <button
                 type="button"
@@ -1402,10 +1490,14 @@ export default function DeviceTable({
 
             <div className="space-y-3">
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Export</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Export
+                </span>
                 <select
                   value={exportTarget}
-                  onChange={(event) => setExportTarget(event.target.value as ExportTargetOption)}
+                  onChange={(event) =>
+                    setExportTarget(event.target.value as ExportTargetOption)
+                  }
                   className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
                 >
                   <option value="device">Device</option>
@@ -1414,10 +1506,14 @@ export default function DeviceTable({
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Format</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Format
+                </span>
                 <select
                   value={exportFormat}
-                  onChange={(event) => setExportFormat(event.target.value as ExportFormatOption)}
+                  onChange={(event) =>
+                    setExportFormat(event.target.value as ExportFormatOption)
+                  }
                   className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
                 >
                   <option value="excel">Excel</option>
@@ -1426,11 +1522,16 @@ export default function DeviceTable({
               </label>
 
               <label className="flex flex-col gap-1">
-                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Filter Heartbeat</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Filter Heartbeat
+                </span>
                 <select
                   value={exportHeartbeatFilter}
                   onChange={(event) =>
-                    setExportHeartbeatFilter(event.target.value as HeartbeatFilterOption)}
+                    setExportHeartbeatFilter(
+                      event.target.value as HeartbeatFilterOption,
+                    )
+                  }
                   className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-sky-400"
                 >
                   <option value="all">Semua</option>
@@ -1444,7 +1545,10 @@ export default function DeviceTable({
               </label>
 
               <p className="text-xs text-gray-500">
-                Data siap di-export: <span className="font-semibold text-gray-700">{exportScopedDevices.length}</span>
+                Data siap di-export:{" "}
+                <span className="font-semibold text-gray-700">
+                  {exportScopedDevices.length}
+                </span>
               </p>
             </div>
 
@@ -1461,7 +1565,9 @@ export default function DeviceTable({
                 onClick={handleRunExport}
                 disabled={exportingExcel || exportingPdf}
               >
-                {exportingExcel || exportingPdf ? "Exporting..." : "Export Sekarang"}
+                {exportingExcel || exportingPdf
+                  ? "Exporting..."
+                  : "Export Sekarang"}
               </Button>
             </div>
           </div>
