@@ -1,6 +1,14 @@
 const reverseGeocodeCache = new Map<string, string | null>();
 const reverseGeocodeInflight = new Map<string, Promise<string | null>>();
 
+const unusableLocationNamePatterns = [
+  /^-$/i,
+  /^geocoder tidak tersedia(?:\s*\(aosp\))?$/i,
+  /^geocoder unavailable(?:\s*\(aosp\))?$/i,
+  /^location unavailable$/i,
+  /^unknown location$/i,
+];
+
 function toKey(latitude: number, longitude: number): string {
   return `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
 }
@@ -8,7 +16,10 @@ function toKey(latitude: number, longitude: number): string {
 export function hasUsableLocationName(value?: string | null): boolean {
   if (!value) return false;
   const normalized = value.trim();
-  return normalized.length > 0 && normalized !== "-";
+  return (
+    normalized.length > 0 &&
+    !unusableLocationNamePatterns.some((pattern) => pattern.test(normalized))
+  );
 }
 
 export async function reverseGeocodeLocation(
