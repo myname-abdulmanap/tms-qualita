@@ -273,7 +273,21 @@ export default function DeviceDetailDialog({
                       : "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
                   }`}
                 >
-                  {online ? "🟢 ONLINE" : "🔴 OFFLINE"}
+                  <span className="inline-flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span
+                        className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${
+                          online ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      />
+                      <span
+                        className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                          online ? "bg-green-500" : "bg-red-500"
+                        }`}
+                      />
+                    </span>
+                    {online ? "ONLINE" : "OFFLINE"}
+                  </span>
                 </span>
                 <span className="text-gray-500 text-xs">
                   {device.lastSeenAt
